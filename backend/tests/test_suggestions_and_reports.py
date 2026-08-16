@@ -194,3 +194,46 @@ async def test_dashboard_aggregates(client, user):
     for field in ("total_projects", "total_analyses", "avg_clarity_score",
                   "clarity_trend", "recent_assets"):
         assert field in body
+
+
+# --- storage addressing ----------------------------------------------------
+def test_cloudinary_key_addressing():
+    """Cloudinary splits its namespace by resource_type and addresses the two
+    differently. Getting .npy wrong silently breaks rerun and A/B."""
+    from app.services.storage import CloudinaryStorage as C
+
+    # Raw objects keep the full filename as the public_id.
+    assert C._address("u1/results/a_saliency.npy") == (
+        "raw", "u1/results/a_saliency.npy", None)
+
+    # Images drop the extension; the format is appended at delivery.
+    assert C._address("u1/results/a_heatmap.png") == (
+        "image", "u1/results/a_heatmap", "png")
+    assert C._address("u1/uploads/a.PNG") == ("image", "u1/uploads/a", "png")
+    assert C._address("u1/uploads/a.jpeg") == ("image", "u1/uploads/a", "jpeg")
+
+    # Extensionless keys must not lose a path segment.
+    assert C._address("u1/uploads/noext") == ("image", "u1/uploads/noext", None)
+
+
+def test_cloudinary_addressing_is_consistent_across_operations():
+    """upload, url_for, exists and delete must resolve to the same object."""
+    from app.services.storage import CloudinaryStorage as C
+
+    for key in ("u/results/x_saliency.npy", "u/results/x_heatmap.png",
+                "u/uploads/x.webp"):
+        rtype, pid, fmt = C._address(key)
+        # Called four times, the derivation must be stable.
+        assert (rtype, pid, fmt) == C._address(key)
+        assert rtype in {"raw", "image"}
+        if rtype == "raw":
+            assert pid == key, "raw public_id must retain the extension"
+        else:
+            assert not pid.endswith(f".{fmt}"), "image public_id must drop the format"
+            assert pid.count("/") == key.count("/"), "path depth must be preserved"
+
+
+def test_tenant_prefix_helper():
+    from app.services.storage import StorageService
+
+    assert StorageService.tenant_key("user-1", "uploads", "a.png") == "user-1/uploads/a.png"

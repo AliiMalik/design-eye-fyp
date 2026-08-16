@@ -112,44 +112,64 @@ class CloudinaryStorage(StorageService):
         self._api = cloudinary.api
         self._cloudinary = cloudinary
 
-    @staticmethod
-    def _public_id(key: str) -> str:
-        return key.rsplit(".", 1)[0]
+    # Cloudinary splits its namespace by resource_type, and the two types
+    # address objects differently: an image's public_id excludes the extension
+    # (the format is appended at delivery), while a raw object's public_id is
+    # the full filename. Deriving both from the key in ONE place is what keeps
+    # upload, URL, existence, and delete addressing the same object -- get it
+    # wrong for .npy and reruns and A/B comparison silently break.
+    RAW_SUFFIXES = (".npy",)
 
-    def save_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
-        resource_type = "image" if content_type.startswith("image/") else "raw"
+    @classmethod
+    def _address(cls, key: str) -> tuple[str, str, str | None]:
+        """Return (resource_type, public_id, image_format) for a storage key."""
+        if key.lower().endswith(cls.RAW_SUFFIXES):
+            return "raw", key, None
+        base, _, ext = key.rpartition(".")
+        if not base:  # no extension at all
+            return "image", key, None
+        return "image", base, ext.lower()
+
+    def save_bytes(self, key: str, data: bytes,
+                   content_type: str = "application/octet-stream") -> str:
+        resource_type, public_id, _ = self._address(key)
         result = self._uploader.upload(
             io.BytesIO(data),
-            public_id=self._public_id(key) if resource_type == "image" else key,
+            public_id=public_id,
             resource_type=resource_type,
             overwrite=True,
-            folder=None,
+            invalidate=True,
+            use_filename=False,
+            unique_filename=False,
         )
         return result["secure_url"]
 
     def read_bytes(self, key: str) -> bytes:
         import httpx
-        resp = httpx.get(self.url_for(key), timeout=30)
+
+        resp = httpx.get(self.url_for(key), timeout=30, follow_redirects=True)
         resp.raise_for_status()
         return resp.content
 
     def delete(self, key: str) -> None:
-        for rtype in ("image", "raw"):
-            try:
-                self._uploader.destroy(
-                    self._public_id(key) if rtype == "image" else key,
-                    resource_type=rtype,
-                )
-            except Exception as exc:  # noqa: BLE001 - deletion is best-effort
-                logger.warning("Cloudinary delete failed for %s (%s): %s", key, rtype, exc)
+        resource_type, public_id, _ = self._address(key)
+        try:
+            self._uploader.destroy(public_id, resource_type=resource_type,
+                                   invalidate=True)
+        except Exception as exc:  # noqa: BLE001 - deletion is best-effort
+            logger.warning("Cloudinary delete failed for %s: %s", key, exc)
 
     def url_for(self, key: str) -> str:
-        url, _ = self._cloudinary.utils.cloudinary_url(self._public_id(key), secure=True)
+        resource_type, public_id, fmt = self._address(key)
+        url, _ = self._cloudinary.utils.cloudinary_url(
+            public_id, resource_type=resource_type, format=fmt, secure=True,
+        )
         return url
 
     def exists(self, key: str) -> bool:
+        resource_type, public_id, _ = self._address(key)
         try:
-            self._api.resource(self._public_id(key))
+            self._api.resource(public_id, resource_type=resource_type)
             return True
         except Exception:  # noqa: BLE001
             return False
