@@ -89,6 +89,16 @@ Use `@designeye.dev`.
 `pytest.ini` pins fixtures *and* tests to one session loop; Celery tasks open
 their own client inside `asyncio.run`.
 
+**Cloudinary resource types.** Images and raw files live in separate
+namespaces and are addressed differently: an image's `public_id` drops the
+extension, a raw object's keeps it. Derive both from the key in
+`CloudinaryStorage._address()` and nowhere else. Getting `.npy` wrong uploads
+fine and then fails to read back, breaking rerun and A/B silently. Run
+`scripts/verify_cloudinary.py` after touching that class.
+
+**`NEXT_PUBLIC_*` is compiled into the bundle**, not read at runtime. Changing
+`NEXT_PUBLIC_API_URL` requires rebuilding the frontend image.
+
 **`<Button asChild>` when wrapping a `<Link>`.** Without it you get invalid
 `<button><a>` nesting. With it, the child must be a single element — never a
 Fragment, or Radix `Slot` puts `className` on the Fragment.
@@ -114,7 +124,7 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 74 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 77 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 

@@ -20,8 +20,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+try:
+    import numpy as np
+    from dotenv import load_dotenv
+    from PIL import Image
+except ModuleNotFoundError as exc:  # wrong interpreter, almost always
+    print(f"Missing dependency: {exc.name}")
+    print(f"\nRun this with the project's virtualenv, not the system Python:")
+    print(f'  {ROOT / ".venv" / "Scripts" / "python.exe"} scripts\\verify_cloudinary.py')
+    raise SystemExit(2) from exc
+
+# Settings resolve env_file relative to the process CWD, so running this from
+# the repo root would silently read the root .env instead of the backend's.
+# Load the backend file explicitly so the script works from anywhere.
+load_dotenv(ROOT / "backend" / ".env", override=False)
 
 from app.config import settings  # noqa: E402
 

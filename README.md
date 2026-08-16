@@ -124,7 +124,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-74 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+77 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -178,6 +178,43 @@ Pydantic schema with one automatic re-prompt on a parse failure, cached per
 result, and rate-limited per user per day. With `LLM_PROVIDER=none` the endpoint
 returns `{"suggestions": [], "llm_status": "unavailable"}` and the UI offers a
 retry — the rest of the product is unaffected.
+
+---
+
+## Deploying to a host
+
+The API image is **self-contained**: the model weights are baked in by
+`COPY app ./app`, so a host that has never seen this repo can run it. The build
+context must contain the `.pth` at build time even though git does not track it.
+
+Set these in the root `.env` before `docker compose up -d --build`:
+
+| Variable | Why |
+|---|---|
+| `JWT_SECRET` | must be a real random value |
+| `CORS_ORIGINS` | your frontend origin, comma-separated; never `*` |
+| `NEXT_PUBLIC_API_URL` | **compiled into the frontend bundle** — changing it needs `docker compose build frontend` |
+| `MONGODB_URI` | e.g. a MongoDB Atlas connection string |
+| `STORAGE_BACKEND=cloudinary` | plus the three `CLOUDINARY_*` values |
+| `DEV_MODE=false` | routes inference through the Celery worker so the API thread is never occupied by a forward pass |
+| `INSTALL_LLM_SDKS=true` | if using a real LLM provider |
+
+`NEXT_PUBLIC_API_URL` is the one that catches people out: Next inlines
+`NEXT_PUBLIC_*` at build time, so a running container cannot pick up a new value
+from the environment. Rebuild the frontend image when it changes.
+
+With `STORAGE_BACKEND=cloudinary` the API no longer mounts `/storage`, so URLs
+stored by a previous local run will 404. Reseed after switching:
+
+```bash
+docker compose exec api python -m app.seed --reset
+```
+
+Verify the storage backend before trusting it with real data:
+
+```bash
+.venv\Scripts\python.exe scriptserify_cloudinary.py
+```
 
 ---
 

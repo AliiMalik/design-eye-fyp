@@ -167,8 +167,13 @@ Indexes: `users.email` unique · `projects.user_id` · `mockup_assets.project_id
 
 `docker-compose.yml` runs mongo, redis, api, worker, frontend. Mongo uses the
 named volume `mongo_data` so data survives `docker compose down`; uploads and
-heatmaps use `storage_data`. Model weights are bind-mounted read-only rather than
-baked into the image, keeping it small and the weights out of git.
+heatmaps use `storage_data` when STORAGE_BACKEND=local.
+
+The model weights ARE baked into the image (`COPY app ./app` includes
+`app/ml/weights/`), so the image is self-contained and deployable to a host that
+has never seen the repo. The compose bind mount merely overlays them, which lets
+you swap a checkpoint without rebuilding. The build context must therefore
+contain the .pth at build time even though git does not track it.
 
 The API image installs torch from the CPU wheel index — the default wheel pulls
 ~2 GB of CUDA payload a CPU container never uses. The frontend builds to a Next

@@ -43,17 +43,20 @@ services:
     environment:
       APP_ENV: production
       # Inference runs inline so the stack is usable even without the worker.
-      DEV_MODE: "true"
-      CORS_ORIGINS: http://localhost:3000
+      DEV_MODE: "${DEV_MODE:-true}"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MONGODB_URI: mongodb://mongo:27017
       MONGODB_DB: designeye
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env at the repo root}
       ACCESS_TOKEN_EXPIRE_MINUTES: "15"
       REFRESH_TOKEN_EXPIRE_DAYS: "7"
-      STORAGE_BACKEND: local
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /app/storage
-      PUBLIC_BASE_URL: http://localhost:8000
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
       MODEL_PATH: app/ml/weights/stage3_ui_best_val.pth
       MODEL_VERSION: stage3-ui-v1
       MAX_UPLOAD_MB: "10"
@@ -100,9 +103,12 @@ services:
       MONGODB_DB: designeye
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env at the repo root}
-      STORAGE_BACKEND: local
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /app/storage
-      PUBLIC_BASE_URL: http://localhost:8000
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
       MODEL_PATH: app/ml/weights/stage3_ui_best_val.pth
       MODEL_VERSION: stage3-ui-v1
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
@@ -120,7 +126,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
     container_name: designeye-frontend
     restart: unless-stopped
     ports:

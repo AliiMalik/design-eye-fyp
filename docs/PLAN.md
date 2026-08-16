@@ -64,7 +64,7 @@ All routes matched to the exports. Canvas heatmap with an SVG focus layer and on
 shared coordinate helper; staged upload progress; synchronised A/B zoom.
 
 ### 7 — Infrastructure, tests, docs
-Docker stack with a named Mongo volume, seed script, 74 pytest cases, and this
+Docker stack with a named Mongo volume, seed script, 77 pytest cases, and this
 documentation set.
 
 ---
@@ -94,9 +94,12 @@ documentation set.
 |---|---|
 | `scripts/verify_model.py` | 13/13 |
 | Golden-path walkthrough (register → … → logout) | 54/54 |
-| `pytest` | 74/74 in ~51 s |
+| `pytest` | 77/77 |
 | `tsc --noEmit` | 0 errors |
 | `next lint` | 0 warnings |
 | Clarity calibration | clean > 75, cluttered < 40 |
 | Docker restart persistence | seeded user survives `down` + `up` |
 | Browser console on every route | 0 errors |
+| `scripts/verify_cloudinary.py` | 14/14 against a live account |
+| Gemini suggestions end to end | ok, ~15 s, schema-valid |
+| Cloudinary end to end (upload, rerun, PDF) | all artefacts served from the CDN |
