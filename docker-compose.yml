@@ -1,0 +1,117 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: designeye-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      # Named volume: data must survive `docker compose down`.
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: designeye-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: designeye-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      # Inference runs inline so the stack is usable even without the worker.
+      DEV_MODE: "true"
+      CORS_ORIGINS: http://localhost:3000
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: designeye
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env at the repo root}
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_DIR: /app/storage
+      PUBLIC_BASE_URL: http://localhost:8000
+      MODEL_PATH: app/ml/weights/stage3_ui_best_val.pth
+      MODEL_VERSION: stage3-ui-v1
+      MAX_UPLOAD_MB: "10"
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_MODEL: ${LLM_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      # Weights are gitignored and never baked into the image.
+      - ./backend/app/ml/weights:/app/app/ml/weights:ro
+      - storage_data:/app/storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: designeye-worker
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --pool=solo
+    environment:
+      APP_ENV: production
+      DEV_MODE: "false"
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: designeye
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env at the repo root}
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_DIR: /app/storage
+      PUBLIC_BASE_URL: http://localhost:8000
+      MODEL_PATH: app/ml/weights/stage3_ui_best_val.pth
+      MODEL_VERSION: stage3-ui-v1
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+    volumes:
+      - ./backend/app/ml/weights:/app/app/ml/weights:ro
+      - storage_data:/app/storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    container_name: designeye-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:
+  redis_data:
+  storage_data:

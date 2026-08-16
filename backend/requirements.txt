@@ -1,0 +1,50 @@
+# --- web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- data / validation ---
+pydantic==2.10.5
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# --- database ---
+motor==3.6.1
+pymongo==4.9.2
+
+# --- auth & security ---
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+PyJWT==2.10.1
+slowapi==0.1.9
+
+# --- task queue ---
+celery==5.4.0
+redis==5.2.1
+
+# --- ML ---
+torch==2.12.0
+torchvision==0.27.0
+
+# --- imaging ---
+pillow==11.1.0
+numpy==2.2.1
+opencv-python-headless==4.11.0.86
+scipy==1.15.1
+cairosvg==2.7.1
+PyMuPDF==1.25.2
+
+# --- storage ---
+cloudinary==1.42.1
+
+# --- pdf ---
+reportlab==4.2.5
+
+# --- llm providers (optional at runtime, selected via LLM_PROVIDER) ---
+anthropic==0.42.0
+openai==1.59.7
+google-generativeai==0.8.3
+
+# --- misc ---
+httpx==0.28.1
+python-dotenv==1.0.1
