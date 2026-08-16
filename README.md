@@ -28,7 +28,7 @@ docker compose up -d --build
 ```
 
 ```bash
-docker compose exec api python -c "import asyncio,sys;sys.path.insert(0,'/app');from scripts.seed_demo import seed;asyncio.run(seed(True))" || python scripts/seed_demo.py --reset
+docker compose exec api python -m app.seed --reset
 ```
 
 Open **http://localhost:3000** and sign in.
@@ -113,7 +113,7 @@ python scripts/verify_model.py
 | `scripts/verify_model.py` | 13 checks: strict checkpoint load, output shape/range, synthetic peak localisation, letterbox alignment |
 | `scripts/make_samples.py` | Regenerates the clarity calibration set |
 | `scripts/calibrate_clarity.py` | Scores the samples; `--tune` grid-searches the constants |
-| `scripts/seed_demo.py` | Seeds the demo account; `--reset` rebuilds it |
+| `scripts/seed_demo.py` | Seeds the demo account; `--reset` rebuilds it. Inside the container use `python -m app.seed` — the implementation lives in `backend/app/seed.py` so it ships in the image, and falls back to generated mockups when `inputs/` is absent. |
 | `scripts/make_demo_assets.py` | Renders the landing-page hero from real model output |
 
 ---
