@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* next-themes drives a class on <html>, so dark: must key off .dark not the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* --- brand: taken from the Visily screens (Figma wins, BUILD.md s10) --- */
+  --color-navy-950: #101636;
+  --color-navy-900: #1b2559;
+  --color-navy-800: #232f6b;
+  --color-navy-700: #2d3b82;
+
+  --color-indigo-50: #eef1ff;
+  --color-indigo-100: #e0e5ff;
+  --color-indigo-200: #c7cfff;
+  --color-indigo-300: #a5b0fb;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #5b6ae8;
+  --color-indigo-600: #4f5bd5;
+  --color-indigo-700: #4149b4;
+
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
+
+  --color-cyan-400: #22d3ee;
+
+  /* --- semantic surfaces (light) --- */
+  --color-canvas: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #fafbfd;
+  --color-shell: #eef1f7;
+  --color-hairline: rgba(15, 23, 42, 0.08);
+  --color-hairline-strong: rgba(15, 23, 42, 0.14);
+  --color-ink: #0f172a;
+  --color-ink-2: #334155;
+  --color-muted: #64748b;
+  --color-faint: #94a3b8;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* --- type --- */
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* --- squircle radii --- */
+  --radius-shell: 2rem;
+  --radius-core: 1.625rem;
+  --radius-card: 1.25rem;
+
+  /* --- motion: real mass, never linear or ease-in-out --- */
+  --ease-spatial: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* --- diffused ambient elevation, never harsh drop shadows --- */
+  --shadow-ambient: 0 1px 2px rgba(16, 22, 54, 0.04),
+                    0 8px 24px -12px rgba(16, 22, 54, 0.12);
+  --shadow-lifted: 0 2px 4px rgba(16, 22, 54, 0.04),
+                   0 18px 48px -18px rgba(16, 22, 54, 0.2);
+  --shadow-glow: 0 12px 40px -12px rgba(79, 91, 213, 0.5);
+}
+
+/* --- dark surfaces --- */
+.dark {
+  --color-canvas: #0a0a0f;
+  --color-surface: #14141c;
+  --color-surface-2: #191922;
+  --color-shell: #101017;
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-hairline-strong: rgba(255, 255, 255, 0.14);
+  --color-ink: #f1f5f9;
+  --color-ink-2: #cbd5e1;
+  --color-muted: #94a3b8;
+  --color-faint: #64748b;
+
+  --shadow-ambient: 0 1px 2px rgba(0, 0, 0, 0.4),
+                    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lifted: 0 2px 4px rgba(0, 0, 0, 0.4),
+                   0 18px 48px -18px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  border-color: var(--color-hairline);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-indigo-600);
+  color: #fff;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.022em;
+}
+
+/* Numerals in metrics read as data, not prose. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- scrollbar --- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-strong);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-clip: content-box; background-color: var(--color-faint); }
+
+/* --- fixed film-grain, never attached to a scrolling container --- */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- gradient mesh, GPU-cheap because nothing animates layout --- */
+.mesh {
+  background-image:
+    radial-gradient(38rem 30rem at 12% -8%, rgba(124, 58, 237, 0.16), transparent 60%),
+    radial-gradient(34rem 26rem at 92% 4%, rgba(34, 211, 238, 0.14), transparent 62%),
+    radial-gradient(40rem 32rem at 50% 108%, rgba(79, 91, 213, 0.18), transparent 65%);
+}
+
+.text-gradient {
+  background: linear-gradient(102deg, var(--color-indigo-600), var(--color-violet-600) 52%, var(--color-cyan-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Inner highlight that makes a surface read as machined hardware. */
+.inner-lip {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+.dark .inner-lip {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
+}
+
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.animate-marquee {
+  animation: marquee 42s linear infinite;
+}
+
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
