@@ -22,10 +22,13 @@ logger = logging.getLogger(__name__)
 VALID_SEVERITY = {"high", "medium", "low"}
 VALID_BASIS = {"clarity_score", "focus_order", "region_saliency", "clutter_index"}
 
+# Model IDs age out fast -- Gemini 1.5 and 2.0 are already shut down and return
+# 404, and the 2.5 cluster retires in Oct 2026. Override per deployment with
+# LLM_MODEL rather than editing this; these are only the fallbacks.
 DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-5",
-    "openai": "gpt-4o-mini",
-    "gemini": "gemini-1.5-flash",
+    "anthropic": "claude-sonnet-5",
+    "openai": "gpt-5.1-mini",
+    "gemini": "gemini-3.5-flash",
 }
 
 
