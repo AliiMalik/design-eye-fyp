@@ -254,7 +254,8 @@ All SDS endpoints are implemented; these are additive.
 | TC-14 expired JWT 401 | `test_auth.py::test_tc14_*` | pass |
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
-legibility, and the LLM adapter's retry behaviour. **74 tests, all passing.**
+legibility, Cloudinary resource-type addressing, and the LLM adapter's
+retry behaviour. **77 tests, all passing.**
 
 ---
 
