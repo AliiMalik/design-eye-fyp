@@ -1,0 +1,92 @@
+"""Render the landing-page hero demo from real model output.
+
+The hero shows an actual mockup, its actual predicted heatmap, and its actual
+focus nodes -- not an illustration of them.
+
+    python scripts/make_demo_assets.py
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
+
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+from PIL import Image  # noqa: E402
+
+from app.ml.inference import load_model, predict_saliency  # noqa: E402
+from app.services.analytics import analyse  # noqa: E402
+
+WEIGHTS = ROOT / "backend" / "app" / "ml" / "weights" / "stage3_ui_best_val.pth"
+OUT = ROOT / "frontend" / "public" / "demo"
+# The metadata is imported as a module, so it lives in the source tree.
+# public/ is for statically served files only -- importing JSON out of it
+# breaks Turbopack module resolution.
+DATA_OUT = ROOT / "frontend" / "lib" / "demo-data.json"
+# A real screen reads as a product screenshot; a bare wireframe does not. This
+# one is a genuine UI that also scores in the strong band, so the hero shows the
+# product working rather than the product complaining.
+SOURCE = ROOT / "inputs" / "screens" / "visily-designeye-login.jpg"
+CROP_ASPECT = 1.34
+MAX_W = 1200
+
+
+def main() -> int:
+    if not SOURCE.is_file():
+        print(f"Missing {SOURCE}.")
+        return 1
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    load_model(WEIGHTS)
+
+    full = Image.open(SOURCE).convert("RGB")
+    crop_h = min(full.height, int(full.width / CROP_ASPECT))
+    img = full.crop((0, 0, full.width, crop_h))
+
+    out = predict_saliency(img)
+    metrics = analyse(out.saliency, np.array(img, dtype=np.uint8))
+
+    scale = min(1.0, MAX_W / img.width)
+    w, h = int(img.width * scale), int(img.height * scale)
+
+    # Hash the filenames: next/image caches aggressively by URL, so a
+    # regenerated asset at a stable path keeps serving the stale version.
+    for old in OUT.glob("*.png"):
+        old.unlink()
+    digest = hashlib.sha1(out.saliency.tobytes()).hexdigest()[:8]
+    mockup_name = f"mockup.{digest}.png"
+    heatmap_name = f"heatmap.{digest}.png"
+
+    img.resize((w, h), Image.LANCZOS).save(OUT / mockup_name, optimize=True)
+    cv2.imwrite(str(OUT / heatmap_name), cv2.resize(out.overlay_bgr, (w, h)))
+
+    payload = {
+        "width": w,
+        "height": h,
+        "mockup_src": f"/demo/{mockup_name}",
+        "heatmap_src": f"/demo/{heatmap_name}",
+        "clarity_score": metrics.clarity_score,
+        "focus_index": metrics.focus_index,
+        "clutter_index": metrics.clutter_index,
+        "region_saliency": metrics.region_saliency,
+        "focus_nodes": [
+            {**n.as_dict(), "x": round(n.x * scale), "y": round(n.y * scale)}
+            for n in metrics.focus_nodes
+        ],
+    }
+    DATA_OUT.parent.mkdir(parents=True, exist_ok=True)
+    DATA_OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    print(f"wrote {OUT}/{mockup_name}, {heatmap_name} and {DATA_OUT}")
+    print(f"clarity={metrics.clarity_score} nodes={len(metrics.focus_nodes)} size={w}x{h}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
