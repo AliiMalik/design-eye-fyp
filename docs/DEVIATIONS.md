@@ -269,3 +269,28 @@ them, and `google-generativeai` alone pulls the entire Google API client stack â
 it dominated the Docker image build. A provider configured without its SDK now
 logs the install command and degrades to `unavailable`, exactly as an
 unreachable provider does. The product is unaffected either way.
+
+---
+
+## 16. LLM model choice and timeout
+
+Measured on the real analytics payload, 3 runs each, all returning valid JSON:
+
+| Model | Avg latency | Range |
+|---|---|---|
+| `gemini-3.5-flash` | 47.0s | 28-71s |
+| **`gemini-3.6-flash`** (default) | **14.4s** | 13.6-15.2s |
+| `gemini-3.7-flash` | 53.1s | 27-82s |
+| `gemini-3.5-flash-lite` | 3.2s | 2.7-3.5s |
+
+`gemini-3.6-flash` is the default: three times faster than 3.5 and, more
+importantly, consistent (+/-1s rather than +/-43s). Flash-Lite is roughly six
+times faster again and remains schema-valid, but cited fewer of the supplied
+metric values, so it is offered as an opt-in rather than the default.
+
+Because measured latency reached 82s on one tier, `LLM_TIMEOUT_SECONDS`
+(default 90) now bounds every provider call. A stalled provider returns
+`llm_status: error` instead of holding the request open.
+
+Provider SDKs are baked into the API image only when the `INSTALL_LLM_SDKS`
+build arg is `true`, keeping the default image small; see README.

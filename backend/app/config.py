@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     LLM_RATE_LIMIT_PER_DAY: int = 50
+    LLM_TIMEOUT_SECONDS: int = 90
 
     # --- rate limiting ---
     AUTH_RATE_LIMIT: str = "10/minute"

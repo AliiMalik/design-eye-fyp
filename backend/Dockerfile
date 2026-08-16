@@ -21,12 +21,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Torch comes from the CPU index: the default wheel pulls ~2GB of CUDA payload
 # that a CPU-only container never uses.
-COPY requirements.txt .
+COPY requirements.txt requirements-llm.txt ./
 RUN pip install --upgrade pip \
     && pip install --index-url https://download.pytorch.org/whl/cpu \
          torch==2.12.0 torchvision==0.27.0 \
     && grep -vE '^(torch|torchvision)==' requirements.txt > /tmp/rest.txt \
     && pip install -r /tmp/rest.txt
+
+# Real LLM provider SDKs are opt-in: they are only needed when LLM_PROVIDER is
+# anthropic/openai/gemini, and google-generativeai alone pulls a large tree.
+# Enable with: INSTALL_LLM_SDKS=true docker compose build api
+ARG INSTALL_LLM_SDKS=false
+RUN if [ "$INSTALL_LLM_SDKS" = "true" ]; then \
+        pip install -r requirements-llm.txt ; \
+    fi
 
 COPY app ./app
 COPY tests ./tests

@@ -33,6 +33,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        # Set INSTALL_LLM_SDKS=true in .env to bake in the real provider SDKs.
+        INSTALL_LLM_SDKS: ${INSTALL_LLM_SDKS:-false}
     container_name: designeye-api
     restart: unless-stopped
     ports:
@@ -76,6 +79,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_LLM_SDKS: ${INSTALL_LLM_SDKS:-false}
     container_name: designeye-worker
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --pool=solo

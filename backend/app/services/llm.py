@@ -7,6 +7,7 @@ explicit unavailable status and the UI offers a retry.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -28,7 +29,7 @@ VALID_BASIS = {"clarity_score", "focus_order", "region_saliency", "clutter_index
 DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-5",
     "openai": "gpt-5.1-mini",
-    "gemini": "gemini-3.5-flash",
+    "gemini": "gemini-3.6-flash",
 }
 
 
@@ -255,15 +256,25 @@ async def generate_suggestions(
     model_name = getattr(provider, "model_name", settings.LLM_MODEL or "")
     user_prompt = build_user_prompt(analytics, user_context)
 
+    # Latency varies wildly between models -- some Gemini Flash tiers have been
+    # measured above 80s on the same prompt. Without a ceiling the caller waits
+    # indefinitely on a stalled provider.
+    timeout = settings.LLM_TIMEOUT_SECONDS
+
     try:
-        raw = await provider.generate(SYSTEM_PROMPT, user_prompt)
+        raw = await asyncio.wait_for(
+            provider.generate(SYSTEM_PROMPT, user_prompt), timeout=timeout)
         try:
             return _parse(raw), "ok", name, model_name
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
             logger.warning("LLM reply failed validation, re-prompting once: %s", exc)
-            retry = await provider.generate(
-                SYSTEM_PROMPT, f"{user_prompt}\n\n{REPAIR_PROMPT}")
+            retry = await asyncio.wait_for(
+                provider.generate(SYSTEM_PROMPT, f"{user_prompt}\n\n{REPAIR_PROMPT}"),
+                timeout=timeout)
             return _parse(retry), "ok", name, model_name
+    except asyncio.TimeoutError:
+        logger.error("LLM provider %s (%s) exceeded %ss", name, model_name, timeout)
+        return None, "error", name, model_name
     except Exception as exc:  # noqa: BLE001 - suggestions must never break a result
         logger.error("LLM generation failed (provider=%s): %s", name, exc)
         return None, "error", name, model_name

@@ -156,6 +156,9 @@ feature is demonstrable with no API key. To make it live, edit `.env` only —
 pip install -r backend/requirements-llm.txt
 ```
 
+For the **Docker** stack, set `INSTALL_LLM_SDKS=true` in the root `.env` and
+rebuild (`docker compose build api worker`) so the SDK is baked into the image.
+
 ```
 LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
