@@ -79,6 +79,15 @@ services:
     container_name: designeye-worker
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --pool=solo
+    # The image's default healthcheck curls the API's HTTP port, which this
+    # service never opens -- it would report unhealthy forever. Ask Celery
+    # instead. start_period covers loading the 99MB checkpoint.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     environment:
       APP_ENV: production
       DEV_MODE: "false"
