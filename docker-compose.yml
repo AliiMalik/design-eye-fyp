@@ -63,6 +63,9 @@ services:
       # Weights are gitignored and never baked into the image.
       - ./backend/app/ml/weights:/app/app/ml/weights:ro
       - storage_data:/app/storage
+      # Optional: lets `python -m app.seed` use the real Visily screens instead
+      # of generated placeholders. The seeder falls back if this is absent.
+      - ./inputs:/inputs:ro
     depends_on:
       mongo:
         condition: service_healthy

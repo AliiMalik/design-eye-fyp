@@ -19,6 +19,9 @@ from pathlib import Path
 # Resolve the repo root whether running from the source tree or from /app
 # inside the container (where scripts/ and inputs/ may not exist).
 ROOT = Path(__file__).resolve().parents[2]
+if not (ROOT / "inputs").is_dir() and Path("/inputs").is_dir():
+    # In the container the repo's inputs/ is bind-mounted at /inputs.
+    ROOT = Path("/")
 
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
@@ -65,9 +68,18 @@ def _generate(kind: str, seed: int) -> Image.Image:
     rng = random.Random(seed)
 
     if kind == "clean":
-        d.rectangle([420, 250, 1020, 300], fill=(17, 24, 39))
-        d.rectangle([500, 320, 940, 352], fill=(148, 163, 184))
-        d.rectangle([620, 420, 820, 472], fill=(79, 91, 213))
+        # Vary the layout by seed, or every clean placeholder renders the same
+        # image and the demo dashboard shows three identical mockups.
+        cx = rng.choice([620, 720, 820])
+        top = rng.choice([200, 250, 300])
+        width = rng.choice([480, 600, 700])
+        d.rectangle([720 - width // 2, top, 720 + width // 2, top + 52], fill=(17, 24, 39))
+        d.rectangle([760 - width // 3, top + 74, 680 + width // 3, top + 106],
+                    fill=(148, 163, 184))
+        d.rectangle([cx - 100, top + 180, cx + 100, top + 232], fill=(79, 91, 213))
+        if rng.random() > 0.5:
+            d.rounded_rectangle([200, H - 260, 1240, H - 90], radius=24,
+                                outline=(226, 232, 240), width=3)
     else:
         for _ in range(280):
             x, y = rng.randint(0, W - 60), rng.randint(0, H - 50)

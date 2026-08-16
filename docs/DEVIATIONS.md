@@ -255,3 +255,17 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, and the LLM adapter's retry behaviour. **74 tests, all passing.**
+
+---
+
+## 15. LLM provider SDKs are optional dependencies
+
+`anthropic`, `openai`, and `google-generativeai` are **not** in
+`backend/requirements.txt`; they live in `backend/requirements-llm.txt`.
+
+The adapter imports each SDK lazily inside its provider's constructor and only
+ever builds the one named by `LLM_PROVIDER`. The default (`mock`) needs none of
+them, and `google-generativeai` alone pulls the entire Google API client stack —
+it dominated the Docker image build. A provider configured without its SDK now
+logs the install command and degrades to `unavailable`, exactly as an
+unreachable provider does. The product is unaffected either way.
