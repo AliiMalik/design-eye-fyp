@@ -40,10 +40,10 @@ cloudinary==1.42.1
 # --- pdf ---
 reportlab==4.2.5
 
-# --- llm providers (optional at runtime, selected via LLM_PROVIDER) ---
-anthropic==0.42.0
-openai==1.59.7
-google-generativeai==0.8.3
+# LLM provider SDKs are NOT installed here. They are imported lazily, only the
+# configured provider is ever constructed, and the default (mock) needs none of
+# them. google-generativeai alone drags in the whole Google API client stack.
+# To enable a real provider: pip install -r requirements-llm.txt
 
 # --- misc ---
 httpx==0.28.1

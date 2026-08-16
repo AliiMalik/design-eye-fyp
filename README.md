@@ -152,10 +152,20 @@ The suggestions module ships working but dormant on a mock provider, so the
 feature is demonstrable with no API key. To make it live, edit `.env` only —
 **no code change**:
 
+```bash
+pip install -r backend/requirements-llm.txt
+```
+
 ```
 LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+The provider SDKs are deliberately **not** in `requirements.txt`: they are
+imported lazily, only the configured provider is ever constructed, and
+`google-generativeai` alone pulls in the entire Google API client stack. If a
+provider is configured without its SDK the app logs the fix and falls back to
+`unavailable` rather than failing to start.
 
 The LLM never sees your image. It receives only the analytics JSON
 (`clarity_score`, `focus_index`, `clutter_index`, `focus_nodes`,

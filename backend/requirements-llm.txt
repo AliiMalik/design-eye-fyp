@@ -1,0 +1,8 @@
+# Optional LLM provider SDKs. Install only the one you intend to use.
+#   pip install -r requirements-llm.txt
+# The app runs fine without any of these: LLM_PROVIDER=mock needs no SDK, and
+# LLM_PROVIDER=none disables suggestions entirely.
+
+anthropic==0.42.0
+openai==1.59.7
+google-generativeai==0.8.3

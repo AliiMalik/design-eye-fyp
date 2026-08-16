@@ -197,6 +197,13 @@ def build_provider(name: str | None = None) -> LLMProvider | None:
     except LLMUnavailable as exc:
         logger.warning("LLM provider %s unavailable: %s", name, exc)
         return None
+    except ImportError:
+        # Provider SDKs are optional; see backend/requirements-llm.txt.
+        logger.warning(
+            "LLM provider '%s' is configured but its SDK is not installed. "
+            "Run: pip install -r requirements-llm.txt", name,
+        )
+        return None
     except Exception as exc:  # noqa: BLE001 - a bad SDK must not break startup
         logger.error("Failed to initialise LLM provider %s: %s", name, exc)
         return None
