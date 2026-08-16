@@ -64,7 +64,7 @@ All routes matched to the exports. Canvas heatmap with an SVG focus layer and on
 shared coordinate helper; staged upload progress; synchronised A/B zoom.
 
 ### 7 — Infrastructure, tests, docs
-Docker stack with a named Mongo volume, seed script, 77 pytest cases, and this
+Docker stack with a named Mongo volume, seed script, 78 pytest cases, and this
 documentation set.
 
 ---
@@ -94,7 +94,7 @@ documentation set.
 |---|---|
 | `scripts/verify_model.py` | 13/13 |
 | Golden-path walkthrough (register → … → logout) | 54/54 |
-| `pytest` | 77/77 |
+| `pytest` | 78/78 |
 | `tsc --noEmit` | 0 errors |
 | `next lint` | 0 warnings |
 | Clarity calibration | clean > 75, cluttered < 40 |

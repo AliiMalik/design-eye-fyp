@@ -42,11 +42,33 @@ class StorageService(ABC):
     def exists(self, key: str) -> bool:
         ...
 
+    # Saliency maps are a 224x224 model output stretched to the source
+    # dimensions, so storing them at full resolution records interpolation, not
+    # information. A 1488x3294 upload produced an 18.7MB array -- over
+    # Cloudinary's 10MB raw-object limit, which failed the whole analysis.
+    # Capping total elements keeps the artefact faithful and always uploadable.
+    MAX_SALIENCY_ELEMENTS = 1_500_000  # ~6 MB as float32
+
     # -- shared helpers ---------------------------------------------------
     def save_npy(self, key: str, array: np.ndarray) -> str:
+        array = self._downscale_saliency(array)
         buf = io.BytesIO()
         np.save(buf, array.astype(np.float32), allow_pickle=False)
         return self.save_bytes(key, buf.getvalue(), "application/octet-stream")
+
+    @classmethod
+    def _downscale_saliency(cls, array: np.ndarray) -> np.ndarray:
+        """Shrink an oversized saliency map, preserving aspect ratio."""
+        if array.ndim != 2 or array.size <= cls.MAX_SALIENCY_ELEMENTS:
+            return array
+
+        import cv2
+
+        height, width = array.shape
+        scale = (cls.MAX_SALIENCY_ELEMENTS / float(array.size)) ** 0.5
+        new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        return cv2.resize(array.astype(np.float32), new_size,
+                          interpolation=cv2.INTER_AREA)
 
     def read_npy(self, key: str) -> np.ndarray:
         return np.load(io.BytesIO(self.read_bytes(key)), allow_pickle=False)

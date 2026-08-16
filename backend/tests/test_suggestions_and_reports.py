@@ -237,3 +237,26 @@ def test_tenant_prefix_helper():
     from app.services.storage import StorageService
 
     assert StorageService.tenant_key("user-1", "uploads", "a.png") == "user-1/uploads/a.png"
+
+
+def test_oversized_saliency_is_downscaled_before_storage():
+    """A tall mockup produced an 18.7MB array, over Cloudinary's 10MB raw limit,
+    which failed the entire analysis. Cap it at the source."""
+    import numpy as np
+
+    from app.services.storage import StorageService
+
+    # 1488x3294, the size that broke the pipeline.
+    big = np.random.default_rng(0).random((3294, 1488)).astype(np.float32)
+    assert big.nbytes > 10 * 1024 * 1024, "fixture must exceed the limit"
+
+    out = StorageService._downscale_saliency(big)
+    assert out.size <= StorageService.MAX_SALIENCY_ELEMENTS
+    assert out.nbytes < 10 * 1024 * 1024, f"still too big: {out.nbytes}"
+
+    # Aspect ratio preserved so the map still overlays the source correctly.
+    assert abs((out.shape[0] / out.shape[1]) - (3294 / 1488)) < 0.02
+
+    # Small maps pass through untouched.
+    small = np.zeros((224, 224), dtype=np.float32)
+    assert StorageService._downscale_saliency(small) is small

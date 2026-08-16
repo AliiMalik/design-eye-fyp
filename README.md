@@ -124,7 +124,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-77 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+78 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 

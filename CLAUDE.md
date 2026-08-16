@@ -124,7 +124,7 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 77 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 78 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 

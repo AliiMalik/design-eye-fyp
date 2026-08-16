@@ -255,7 +255,7 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, Cloudinary resource-type addressing, and the LLM adapter's
-retry behaviour. **77 tests, all passing.**
+retry behaviour. **78 tests, all passing.**
 
 ---
 
