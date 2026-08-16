@@ -1,0 +1,43 @@
+# --- model weights (99MB; distributed separately) ---
+*.pth
+*.pt
+*.ckpt
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- node / next ---
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- env ---
+.env
+.env.local
+.env.*.local
+
+# --- runtime data ---
+storage/
+storage_test/
+backend/storage/
+backend/storage_test/
+
+# --- working files ---
+.scratch/
+inputs/sds_extracted.txt
+
+# --- os / editor ---
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
