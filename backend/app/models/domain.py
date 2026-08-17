@@ -125,6 +125,9 @@ class HeatmapResult(MongoModel):
     clutter_index: float                     # addition
     region_saliency: dict[str, float]        # addition (3x3 grid)
     focus_nodes: list[FocusNode]
+    # Longer sequence used only for the animated scanpath. Its first five entries
+    # are the same peaks as focus_nodes; existing documents predate this field.
+    scanpath_nodes: list[FocusNode] = Field(default_factory=list)
     model_version: str
     inference_time_ms: int
     created_at: datetime = Field(default_factory=utcnow)

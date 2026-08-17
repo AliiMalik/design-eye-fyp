@@ -38,7 +38,16 @@ EDGE_LONG_SIDE = 512         # fixed long side for edge density
 NMS_RADIUS = 20              # tuned up from 10px in Sprint 4 (SDS Table 12)
 NMS_RADIUS_FRACTION = 0.08   # floor scales with image size; see extract_focus_order
 TOP_N_FOCUS_NODES = 5
+SCANPATH_NODES = 10         # longer sequence, animation only; focus_nodes stays 5
 FOCUS_BLUR_SIGMA = 2.0
+
+# Fixation timing for the simulated scanpath. Typical reading fixations run
+# 200-300ms with ~30-50ms saccades between them (Rayner 1998). The model
+# predicts WHERE attention lands, not WHEN, so dwell is scaled by predicted
+# strength as a presentation choice -- it is not a temporal prediction.
+DWELL_MIN_MS = 180
+DWELL_MAX_MS = 320
+SACCADE_MS = 40
 
 REGION_KEYS = [
     "top_left", "top_center", "top_right",
@@ -66,6 +75,7 @@ class AnalyticsResult:
     clutter_index: float
     region_saliency: dict[str, float]
     focus_nodes: list[FocusNodeData] = field(default_factory=list)
+    scanpath_nodes: list[FocusNodeData] = field(default_factory=list)
 
 
 def _resize_long_side(gray: np.ndarray, long_side: int) -> np.ndarray:
@@ -175,6 +185,37 @@ def extract_focus_order(saliency: np.ndarray, top_n: int = TOP_N_FOCUS_NODES,
     return nodes
 
 
+def dwell_ms_for(intensity: float) -> int:
+    """Dwell time for a fixation, scaled by predicted strength."""
+    span = DWELL_MAX_MS - DWELL_MIN_MS
+    return int(round(DWELL_MIN_MS + span * float(np.clip(intensity, 0.0, 1.0))))
+
+
+def scanpath_timeline(nodes: list[FocusNodeData]) -> list[dict]:
+    """Absolute start/end times for each fixation, in milliseconds.
+
+    Shared by the animated player, the video renderer, and the PDF filmstrip so
+    all three show the identical sequence.
+    """
+    timeline: list[dict] = []
+    clock = 0
+    for i, node in enumerate(nodes):
+        if i > 0:
+            clock += SACCADE_MS
+        dwell = dwell_ms_for(node.intensity)
+        timeline.append({
+            "rank": node.rank, "x": node.x, "y": node.y,
+            "intensity": round(node.intensity, 4),
+            "start_ms": clock, "dwell_ms": dwell, "end_ms": clock + dwell,
+        })
+        clock += dwell
+    return timeline
+
+
+def total_scanpath_ms(nodes: list[FocusNodeData]) -> int:
+    return scanpath_timeline(nodes)[-1]["end_ms"] if nodes else 0
+
+
 def compute_region_saliency(saliency: np.ndarray) -> dict[str, float]:
     """Mean saliency per cell of a 3x3 grid, keyed top_left .. bot_right."""
     grid = cv2.resize(saliency.astype(np.float32), (3, 3), interpolation=cv2.INTER_AREA)
@@ -190,10 +231,18 @@ def analyse(saliency: np.ndarray, image_rgb: np.ndarray) -> AnalyticsResult:
     """
     focus_index = normalise_focus(compute_focus_index(saliency))
     clutter_index = compute_clutter_index(image_rgb)
+
+    # One extraction, two views. The peak search is greedy and deterministic, so
+    # the first TOP_N_FOCUS_NODES of the longer sequence are identical to running
+    # it with top_n=5 -- the animation can never disagree with the Focus Order
+    # list, and TC-09 keeps seeing exactly 5 nodes.
+    scanpath = extract_focus_order(saliency, top_n=SCANPATH_NODES)
+
     return AnalyticsResult(
         clarity_score=compute_clarity_score(focus_index, clutter_index),
         focus_index=float(round(focus_index, 4)),
         clutter_index=float(round(clutter_index, 4)),
         region_saliency=compute_region_saliency(saliency),
-        focus_nodes=extract_focus_order(saliency),
+        focus_nodes=scanpath[:TOP_N_FOCUS_NODES],
+        scanpath_nodes=scanpath,
     )

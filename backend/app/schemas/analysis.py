@@ -72,6 +72,16 @@ class FocusNodeSchema(BaseModel):
     intensity: float
 
 
+class ScanpathStep(BaseModel):
+    rank: int
+    x: int
+    y: int
+    intensity: float
+    start_ms: int
+    dwell_ms: int
+    end_ms: int
+
+
 class ResultResponse(BaseModel):
     result_id: str
     asset_id: str
@@ -83,6 +93,8 @@ class ResultResponse(BaseModel):
     clutter_index: float
     region_saliency: dict[str, float]
     focus_nodes: list[FocusNodeSchema]
+    scanpath: list[ScanpathStep] = Field(default_factory=list)
+    scanpath_total_ms: int = 0
     model_version: str
     inference_time_ms: int
     created_at: datetime

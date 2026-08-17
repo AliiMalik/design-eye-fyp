@@ -83,6 +83,17 @@ export interface UploadResponse {
   status: string;
 }
 
+/** One step of the predicted viewing order, with its timing on the playback. */
+export interface ScanpathStep {
+  rank: number;
+  x: number;
+  y: number;
+  intensity: number;
+  start_ms: number;
+  dwell_ms: number;
+  end_ms: number;
+}
+
 export interface AnalysisResult {
   result_id: string;
   asset_id: string;
@@ -94,6 +105,8 @@ export interface AnalysisResult {
   clutter_index: number;
   region_saliency: Record<string, number>;
   focus_nodes: FocusNode[];
+  scanpath: ScanpathStep[];
+  scanpath_total_ms: number;
   model_version: string;
   inference_time_ms: number;
   created_at: string;

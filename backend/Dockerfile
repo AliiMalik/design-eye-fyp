@@ -10,6 +10,7 @@ WORKDIR /app
 # System libraries required by opencv-headless, cairosvg (SVG), and PyMuPDF (PDF).
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl \
+      ffmpeg \
       libglib2.0-0 \
       libgl1 \
       libcairo2 \

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { ClarityGauge } from "@/components/app/clarity-gauge";
 import { HeatmapViewer, type ViewMode } from "@/components/app/heatmap-viewer";
+import { ScanpathPlayer } from "@/components/app/scanpath-player";
 import { SuggestionsPanel } from "@/components/app/suggestions-panel";
 import { Bezel } from "@/components/ui/bezel";
 import { Button } from "@/components/ui/button";
@@ -25,10 +26,14 @@ import { useDeleteResult, useResult, useRerun } from "@/hooks/use-api";
 import { API_URL, api } from "@/lib/api";
 import { clarityBand, cn, formatRelative } from "@/lib/utils";
 
-const MODES: { key: ViewMode; label: string }[] = [
+/** "scanpath" is a sibling view, not a HeatmapViewer mode -- it owns its canvas. */
+type PanelMode = ViewMode | "scanpath";
+
+const MODES: { key: PanelMode; label: string }[] = [
   { key: "both", label: "Both" },
   { key: "heatmap", label: "Heatmap" },
   { key: "focus", label: "Focus order" },
+  { key: "scanpath", label: "Watch the replay" },
   { key: "original", label: "Original" },
 ];
 
@@ -47,7 +52,7 @@ export default function ResultPage() {
   const rerun = useRerun();
   const remove = useDeleteResult();
 
-  const [mode, setMode] = useState<ViewMode>("both");
+  const [mode, setMode] = useState<PanelMode>("both");
   const [opacity, setOpacity] = useState(0.75);
   const [downloading, setDownloading] = useState(false);
 
@@ -221,7 +226,12 @@ export default function ResultPage() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div
+                  className={cn(
+                    "flex items-center gap-2.5",
+                    mode === "scanpath" && "hidden",
+                  )}
+                >
                   <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--color-faint)]">
                     Low
                   </span>
@@ -238,18 +248,36 @@ export default function ResultPage() {
                 </div>
               </div>
 
-              <HeatmapViewer
-                mockupUrl={result.mockup_url}
-                heatmapUrl={result.heatmap_url}
-                imageWidth={result.image_width}
-                imageHeight={result.image_height}
-                focusNodes={result.focus_nodes}
-                mode={mode}
-                opacity={opacity}
-                className="mt-5 h-[30rem] sm:h-[34rem]"
-              />
+              {mode === "scanpath" ? (
+                <ScanpathPlayer
+                  className="mt-5"
+                  assetId={assetId}
+                  mockupUrl={result.mockup_url}
+                  imageWidth={result.image_width}
+                  imageHeight={result.image_height}
+                  steps={result.scanpath}
+                  totalMs={result.scanpath_total_ms}
+                  filename={result.original_filename}
+                />
+              ) : (
+                <HeatmapViewer
+                  mockupUrl={result.mockup_url}
+                  heatmapUrl={result.heatmap_url}
+                  imageWidth={result.image_width}
+                  imageHeight={result.image_height}
+                  focusNodes={result.focus_nodes}
+                  mode={mode}
+                  opacity={opacity}
+                  className="mt-5 h-[30rem] sm:h-[34rem]"
+                />
+              )}
 
-              <div className="mt-5 flex items-center gap-4">
+              <div
+                className={cn(
+                  "mt-5 flex items-center gap-4",
+                  mode === "scanpath" && "hidden",
+                )}
+              >
                 <label
                   htmlFor="opacity"
                   className="flex items-center gap-2 text-[12px] font-medium text-[var(--color-muted)]"
@@ -272,9 +300,11 @@ export default function ResultPage() {
                   {Math.round(opacity * 100)}%
                 </span>
               </div>
-              <p className="mt-2 text-[11px] text-[var(--color-faint)]">
-                Ctrl/⌘ + scroll to zoom, drag to pan when zoomed in.
-              </p>
+              {mode !== "scanpath" ? (
+                <p className="mt-2 text-[11px] text-[var(--color-faint)]">
+                  Ctrl/⌘ + scroll to zoom, drag to pan when zoomed in.
+                </p>
+              ) : null}
             </div>
           </Bezel>
         </Reveal>

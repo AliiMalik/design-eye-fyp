@@ -143,7 +143,8 @@ def _suggestions_block(story: list, st: dict, suggestions: dict[str, Any] | None
 def build_result_report(asset: dict[str, Any], result: dict[str, Any],
                         heatmap_png: bytes | None,
                         suggestions: dict[str, Any] | None = None,
-                        project_title: str = "") -> bytes:
+                        project_title: str = "",
+                        filmstrip_png: bytes | None = None) -> bytes:
     """Single-mockup analysis report."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -202,6 +203,24 @@ def build_result_report(asset: dict[str, Any], result: dict[str, Any],
             ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ]))
         story.append(table)
+
+    if filmstrip_png:
+        story.append(PageBreak())
+        story.append(Paragraph("Predicted Viewing Order", st["h2"]))
+        story.append(Paragraph(
+            "Frames from the replay, earliest first. The circled marker is the "
+            "predicted point of gaze; numbered dots are the stops reached so far.",
+            st["small"]))
+        story.append(Spacer(1, 6))
+        strip = _fit_image(filmstrip_png, CONTENT_W, 205 * mm)
+        if strip is not None:
+            story.append(strip)
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(
+            "This is a simulation, not a recording. The model predicts where "
+            "people are most likely to look; the order shown is strongest-first, "
+            "with pause lengths taken from published eye-tracking research. Real "
+            "viewers will not follow this exact route.", st["small"]))
 
     story.append(PageBreak())
     _suggestions_block(story, st, suggestions)

@@ -192,6 +192,7 @@ async def seed(reset: bool) -> int:
                 clutter_index=metrics.clutter_index,
                 region_saliency=metrics.region_saliency,
                 focus_nodes=[n.as_dict() for n in metrics.focus_nodes],
+                scanpath_nodes=[n.as_dict() for n in metrics.scanpath_nodes],
                 model_version=settings.MODEL_VERSION,
                 inference_time_ms=out.inference_time_ms,
             )
