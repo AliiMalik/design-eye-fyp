@@ -83,6 +83,7 @@ def _result_response(asset: dict, result: dict) -> ResultResponse:
         viewports=[ViewportSchema(**v) for v in result.get("viewports", [])],
         weakest_viewport=result.get("weakest_viewport"),
         score_in_range=bool(result.get("score_in_range", True)),
+        ui_theme=result.get("ui_theme", "light"),
     )
 
 

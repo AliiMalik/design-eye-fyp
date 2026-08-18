@@ -264,7 +264,7 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, Cloudinary resource-type addressing, and the LLM adapter's
-retry behaviour. **150 tests, all passing.**
+retry behaviour. **160 tests, all passing.**
 
 ---
 
@@ -474,3 +474,64 @@ segmentation cannot fix -- an ultra-wide panorama export, where the starvation i
 horizontal.
 
 Covered by `tests/test_viewports.py` (26 tests).
+
+---
+
+## 20. Dark-mode compensation (addition beyond the SDS)
+
+The trained checkpoint reads dark interfaces badly. This was found by comparing
+the product against an independent estimate on a real screen, and then isolated
+with a controlled experiment.
+
+**The measurement.** One synthetic layout, colour scheme flipped, edge density
+held constant:
+
+| | focus | edge density | clarity |
+|---|---|---|---|
+| light | 0.892 | 0.0223 | **89.28** |
+| dark | 0.200 | 0.0221 | **37.40** |
+
+51.9 points from colour alone. Inverting the calibration set costs 10-19% of
+`focus_raw` on pixel-identical content (`real_login` 88.98 -> 80.11,
+`real_registration` 94.95 -> 76.79), so this is the checkpoint's bias rather than
+a property of any design.
+
+**Confirmed on a real screen** before the fix was written: the same Google
+Classroom view scored **27.4** dark and **65.4** light. Decomposing the 38-point
+gap, focus contributed 37.2 and clutter 0.7 -- **98% of it is the model**.
+
+**Two mechanisms, both addressed by the same fix.** The checkpoint was trained on
+light UI, so dark input is out of domain; and `letterbox_with_meta` pads to
+224x224 with **white**, which for a 9:19.5 phone screen is 54% of the frame, so a
+dark upload arrives as a black island in a white field -- a boundary that exists
+nowhere in training. Brightening makes the content agree with its own padding.
+
+**What the fix does.** `app/ml/theme.py` flips the **luminance channel only** for
+uploads whose mean luminance is below `DARK_UI_LUMA` (100), and feeds that to the
+model. Everything not produced by the model uses the original pixels.
+
+- Luminance-only, not RGB: inverting RGB turns a blue primary button orange,
+  discarding colour the model reacts to. Measured 79.98 against 79.21 for RGB.
+- The threshold is measured, not chosen by taste: across all 25 light screens in
+  `inputs/` the lowest mean luminance is 166.3, and dark screens sit near 25. The
+  gate sits in the empty band, deliberately nearer the dark side because a false
+  positive would cost a light design ~55 points.
+
+**Verified not to disturb anything else.** Edge density is bit-identical under
+inversion (Sobel measures gradient magnitude), and is computed on the original
+regardless. The saliency map keeps the original dimensions, so Focus Order, the
+replay and the region grid stay in the uploaded image's coordinate space -- the
+hottest region cell is unchanged. The heatmap overlay is rebuilt on the original,
+so the user never sees a brightened version of their own design.
+
+**Known limitation.** Any hard gate is a discontinuity. Sweeping a design's
+background luminance across the threshold steps the score about 12 points as
+compensation switches on. Real designs do not occupy that band, but a mid-grey
+interface scored near the gate deserves less confidence.
+
+**This is a workaround for a training-data gap, not a repair of it.** The honest
+fix is a checkpoint trained on dark UI. Until then the result records `ui_theme`
+and the UI says plainly that a brightened copy was used. Recovery is partial:
+37.40 -> 79.98 against a light equivalent's 89.28.
+
+Covered by `tests/test_theme.py` (10 tests).

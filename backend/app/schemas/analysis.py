@@ -126,6 +126,7 @@ class ResultResponse(BaseModel):
     viewports: list[ViewportSchema] = Field(default_factory=list)
     weakest_viewport: int | None = None
     score_in_range: bool = True
+    ui_theme: str = "light"
 
 
 class StatusResponse(BaseModel):

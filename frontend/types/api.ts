@@ -186,6 +186,9 @@ export interface AnalysisResult {
   viewports: ViewportScore[];
   weakest_viewport: number | null;
   score_in_range: boolean;
+  /** "dark" means the saliency model was shown a brightened copy, because it
+   *  reads dark interfaces badly. Surfaced so the compensation is not silent. */
+  ui_theme: string;
 }
 
 export interface ViewportScore {

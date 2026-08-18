@@ -125,7 +125,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-150 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+160 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -194,6 +194,25 @@ sitting across a fold gets missed. When a design is longer than one screen the
 upload page asks which screen size to assume — phone, tablet or desktop — because
 that genuinely cannot be inferred from the image (a phone frame exported at 2.5×
 is wider than a laptop). See [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §19.
+
+---
+
+## Dark designs
+
+The attention model was trained on light interfaces and reads dark ones badly —
+on one test layout, flipping only the colour scheme moved the score from 89.3 to
+37.4, with the visual density unchanged. On a real screen the same view scored
+27.4 dark and 65.4 light.
+
+So when an upload is dark, DesignEye shows the model a **brightened copy** and
+scores that. Your design is never altered — the heatmap, the report and every
+measurement that doesn't come from the model use your original pixels, and the
+results page says plainly when this happened.
+
+It is a workaround, not a cure: the real fix is a model trained on dark
+interfaces. Recovery is good but partial (37.4 → 80.0 against a light
+equivalent's 89.3), so treat dark-mode scores as slightly conservative. See
+[`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §20.
 
 ---
 

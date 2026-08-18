@@ -172,6 +172,10 @@ class HeatmapResult(MongoModel):
     # False when the frame's shape leaves too little signal to score at all --
     # geometry, not a judgement about the design. See services/viewports.py.
     score_in_range: bool = True
+    # "dark" means the checkpoint was shown an inverted copy, because it
+    # reads dark interfaces badly. Recorded so the compensation is never
+    # silent -- see app/ml/theme.py.
+    ui_theme: str = "light"
     model_version: str
     inference_time_ms: int
     created_at: datetime = Field(default_factory=utcnow)

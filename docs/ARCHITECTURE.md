@@ -56,6 +56,7 @@ screen in **one** provider call. See "Multi-screen flows" below.
 | `app/ml/model.py` | **locked** SalGAN architecture — never edit |
 | `app/ml/preprocess.py` | letterbox + the inverse transform |
 | `app/ml/inference.py` | singleton loader, predict, JET overlay |
+| `app/ml/theme.py` | dark-mode detection and the brightened copy fed to the model |
 | `app/services/analytics.py` | Clarity Score, Focus Order, region grid |
 | `app/services/images.py` | format sniffing, rasterisation, validation |
 | `app/services/storage.py` | `StorageService` + local/Cloudinary impls |

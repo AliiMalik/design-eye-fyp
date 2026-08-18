@@ -26,6 +26,7 @@ from app.models.domain import (
     new_id,
 )
 from app.ml.inference import build_overlay, load_model, predict_saliency
+from app.ml.theme import detect_theme, for_model, mean_luminance
 from app.services.analytics import analyse
 from app.services.storage import StorageService, get_storage
 from app.services.viewports import (
@@ -97,10 +98,23 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
         tiles = slice_viewports(img, device)
         image_rgb = np.array(img, dtype=np.uint8)
 
+        # The checkpoint reads dark interfaces badly, so it is shown an inverted
+        # copy. Detected once for the whole page rather than per viewport, so a
+        # dark page cannot be scored under two different assumptions. Everything
+        # not produced by the model still uses the original pixels.
+        theme = detect_theme(img)
+        dark = theme == "dark"
+        if dark:
+            logger.info("Asset %s looks dark-themed (luma %.0f); inverting for inference",
+                        asset_id, mean_luminance(img))
+
         if len(tiles) == 1:
-            out = predict_saliency(img)
+            out = predict_saliency(for_model(img, dark))
             saliency = out.saliency
-            overlay_bgr = out.overlay_bgr
+            # predict_saliency builds its overlay on whatever it was given, so on
+            # the dark path that would be the inverted copy. The heatmap the user
+            # sees must sit on the design they uploaded.
+            overlay_bgr = build_overlay(img, saliency) if dark else out.overlay_bgr
             inference_ms = out.inference_time_ms
             per_viewport: list[ViewportScore] = []
         else:
@@ -113,7 +127,7 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
             per_viewport = []
             inference_ms = 0
             for vp in tiles:
-                vout = predict_saliency(vp.image)
+                vout = predict_saliency(for_model(vp.image, dark))
                 inference_ms += vout.inference_time_ms
                 maps.append((vp, vout.saliency))
                 vm = analyse(vout.saliency, np.array(vp.image, dtype=np.uint8))
@@ -176,6 +190,7 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
             viewports=[v.as_dict() for v in per_viewport],
             weakest_viewport=aggregate.weakest_index if aggregate else None,
             score_in_range=scoreable,
+            ui_theme=theme,
             model_version=settings.MODEL_VERSION,
             inference_time_ms=inference_ms,
         )

@@ -339,6 +339,17 @@ export default function ResultPage() {
                         : "Attention is scattered across a visually dense layout. Consider consolidating."}
                 </p>
 
+                {result.ui_theme === "dark" ? (
+                  <div className="mt-5 rounded-xl bg-[var(--color-surface-2)] p-3.5 ring-1 ring-[var(--color-hairline)]">
+                    <p className="text-[12.5px] leading-relaxed text-[var(--color-muted)]">
+                      This is a dark design. Our attention model reads light
+                      screens more reliably, so it was shown a brightened copy of
+                      your upload. Your design is unchanged — only the score was
+                      worked out this way.
+                    </p>
+                  </div>
+                ) : null}
+
                 {!result.score_in_range ? (
                   <div className="mt-5 rounded-xl bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/20">
                     <p className="text-[12.5px] leading-relaxed text-amber-900 dark:text-amber-200">

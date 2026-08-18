@@ -103,6 +103,15 @@ TC-09 pins focus_nodes at exactly 5. Timing lives only in
 `analytics.scanpath_timeline()` so the player, the video, and the PDF filmstrip
 cannot disagree.
 
+**The checkpoint under-reads dark UI, and is shown a brightened copy.**
+Measured: one layout, colours flipped, edge density held constant, clarity 89.28
+-> 37.40 -- 51.9 points from colour alone. Confirmed on a real screen at 65.4
+light versus 27.4 dark, of which 98% was the focus term. `ml/theme.py` flips the
+**luminance channel only** below `DARK_UI_LUMA`; inverting RGB would turn a blue
+button orange and scored worse. Only the model's INPUT is changed -- edge
+density, the overlay and every coordinate come from the original pixels, and
+`ui_theme` is recorded so the compensation is never silent.
+
 **A long page is segmented BEFORE inference, never after.** The letterbox is why:
 at 15:1 the page fills 6.2% of the model's 224×224 input and the rest is padding,
 so the whole-page saliency map is derived from a 14px sliver. Computing focus per
@@ -167,7 +176,7 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 150 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 160 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 
