@@ -128,6 +128,9 @@ class MockupAsset(MongoModel):
     original_filename: str
     # Set only for screens that came from a multi-page upload.
     batch_id: str | None = None
+    # Viewport assumption used to score a scrolling page; blank means the
+    # upload fitted one screen. Set at upload time so a rerun is reproducible.
+    viewport_device: str = ""
     page_number: int | None = None
     format: AssetFormat
     file_size_kb: int
@@ -158,6 +161,17 @@ class HeatmapResult(MongoModel):
     # Longer sequence used only for the animated scanpath. Its first five entries
     # are the same peaks as focus_nodes; existing documents predate this field.
     scanpath_nodes: list[FocusNode] = Field(default_factory=list)
+    # Scroll-aware scoring. A full-page export is analysed one viewport at a
+    # time, because a 15:1 image occupies 6% of the model's letterboxed input and
+    # scores 0.0 whatever the design looks like. viewport_count == 1 means the
+    # upload fitted a single screen and was scored whole, as before.
+    viewport_device: str = ""
+    viewport_count: int = 1
+    viewports: list[dict] = Field(default_factory=list)
+    weakest_viewport: int | None = None
+    # False when the frame's shape leaves too little signal to score at all --
+    # geometry, not a judgement about the design. See services/viewports.py.
+    score_in_range: bool = True
     model_version: str
     inference_time_ms: int
     created_at: datetime = Field(default_factory=utcnow)

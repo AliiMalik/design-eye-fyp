@@ -125,7 +125,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-124 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+150 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -173,6 +173,27 @@ and the PDF itself is never stored, only the pages rasterised out of it.
 A single-image upload works exactly as before; if you upload a multi-page PDF
 through the normal route it still analyses page one, but now it tells you how
 many screens it found and offers to analyse them all.
+
+---
+
+## Long, scrolling designs
+
+If you export a whole page rather than a single screen, DesignEye scores it **one
+screenful at a time** and averages the results, because nobody sees a long page
+all at once — and neither can the model.
+
+This matters more than it sounds. Fed a seven-screen page as one image, the model
+receives a 14-pixel-wide sliver inside its square input (94% of the frame is
+padding), both halves of the Clarity Score hit their limits, and the score is
+forced to **0.0 no matter how good the design is**. The same page scored screen by
+screen comes out at 39.5, with the weakest screen named.
+
+The results page shows the per-screen breakdown so you can see exactly where
+attention holds up and where it falls away. Screens overlap slightly, so nothing
+sitting across a fold gets missed. When a design is longer than one screen the
+upload page asks which screen size to assume — phone, tablet or desktop — because
+that genuinely cannot be inferred from the image (a phone frame exported at 2.5×
+is wider than a laptop). See [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §19.
 
 ---
 

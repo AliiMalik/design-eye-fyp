@@ -179,6 +179,22 @@ export interface AnalysisResult {
   image_height: number;
   original_filename: string;
   project_id: string;
+  /** 1 means the upload fitted one screen; above that, clarity_score is the
+   *  mean of the per-viewport scores in `viewports`. */
+  viewport_device: string;
+  viewport_count: number;
+  viewports: ViewportScore[];
+  weakest_viewport: number | null;
+  score_in_range: boolean;
+}
+
+export interface ViewportScore {
+  index: number;
+  top: number;
+  bottom: number;
+  clarity_score: number;
+  focus_index: number;
+  clutter_index: number;
 }
 
 export interface TaskStatus {

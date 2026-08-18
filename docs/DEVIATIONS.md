@@ -264,7 +264,7 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, Cloudinary resource-type addressing, and the LLM adapter's
-retry behaviour. **124 tests, all passing.**
+retry behaviour. **150 tests, all passing.**
 
 ---
 
@@ -407,3 +407,70 @@ name because it is machine-read. Only the prose changed. `MockProvider`'s copy
 was rewritten to the same standard, since mock is the default. Guarded by
 `test_prompts_forbid_internal_field_names_in_prose` and
 `test_mock_suggestions_read_as_english`.
+
+---
+
+## 19. Scroll-aware scoring for full-page exports (addition beyond the SDS)
+
+The SDS assumes an upload is one screen. A designer exporting a whole scrolling
+page hands us an image with an aspect ratio no human ever sees at once, and the
+Clarity Score for such a page was not merely inaccurate -- it was **arithmetically
+forced to 0.0** regardless of the design.
+
+**Two mechanical failures, both from the same cause.** Measured on a 900x13650
+page (15.2:1, seven phone screens):
+
+| | whole page | one viewport |
+|---|---|---|
+| Content inside the 224x224 letterboxed input | **6.2%** (a 14x224 sliver) | 46% |
+| Grid available for edge density | 33x512 | 236x512 |
+| `focus_raw` | 0.026 -- **clamped** at `FOCUS_RAW_MIN` | 0.077-0.127 |
+| `clutter` | 1.000 -- **clamped** | 0.12-0.72 |
+| Clarity | **0.00** | 25.7-64.7 |
+
+With both terms clamped the formula has no remaining input, so every such page
+returns the same number. Degradation is steep and starts immediately above one
+screen: the same content cropped to 2.17 / 3 / 4 / 5 / 6 viewports scores
+25.74 / 17.90 / 8.08 / 0.84 / 0.00.
+
+**The fix: segment into viewports before inference.** `services/viewports.py`
+slices a page taller than `SEGMENT_TRIGGER` (1.35) viewports into overlapping
+viewport-sized tiles, scores each with the existing single-screen path, and
+reports the mean plus the per-viewport breakdown. The same page now scores
+**39.53** with the weakest screen identified.
+
+Segmentation *must* precede inference. Computing focus per band on a whole-page
+saliency map would cost one forward pass instead of N, but that map is derived
+from the 14px sliver -- there is no signal in it left to partition.
+
+**Details that matter.**
+
+- **Overlap of 12%.** Scrolling is continuous; butting tiles together invents a
+  seam the design does not have and can cut an element in half.
+- **The final tile is pulled up, not clipped.** A clipped tail tile keeps the
+  pathological aspect ratio the module exists to remove -- it came out at 1.82:1
+  instead of 2.17:1 and was scored as though it were a screen.
+- **Focus Order, the replay and the region grid come off a stitched map**, so
+  their coordinates stay in the uploaded page's pixel space and the numbered dots
+  land where the user can see them. Overlaps are averaged with a linear feather;
+  a hard join leaves a visible band across the heatmap at every boundary.
+- **The headline score is an unweighted mean.** Weighting upper viewports more
+  heavily would model the fact that fewer people scroll to the bottom, but that
+  decay curve would be our assumption rather than a model output -- the same line
+  the scanpath timing sits on. The breakdown is shown alongside, so nothing hides
+  behind the average.
+- **The viewport height is an explicit choice**, defaulted from orientation and
+  overridable on upload, because it cannot be inferred reliably: a phone frame
+  exported at 2.5x is 2325px wide, overlapping desktop widths exactly.
+
+**Scoreability is a geometry test, not a clamp test.** The first design detected
+"both terms clamped" and reported the score as unreliable. That is wrong: the
+calibration set's `synth_data_table` and `synth_dense_dashboard` both report
+focus 0.0000 with clutter 1.0000 and score 0.00, and those are *correct* readings
+of genuinely unusable designs that TC-08 depends on. An unscoreable page looks
+identical in the metrics and differs only in its shape, so
+`letterbox_content_fraction` drives the flag instead. It also catches what
+segmentation cannot fix -- an ultra-wide panorama export, where the starvation is
+horizontal.
+
+Covered by `tests/test_viewports.py` (26 tests).

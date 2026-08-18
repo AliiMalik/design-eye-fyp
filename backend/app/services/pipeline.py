@@ -25,9 +25,18 @@ from app.models.domain import (
     TaskStatus,
     new_id,
 )
-from app.ml.inference import load_model, predict_saliency
+from app.ml.inference import build_overlay, load_model, predict_saliency
 from app.services.analytics import analyse
 from app.services.storage import StorageService, get_storage
+from app.services.viewports import (
+    Viewport,
+    ViewportScore,
+    aggregate_scores,
+    default_device,
+    is_scoreable,
+    slice_viewports,
+    stitch_saliency,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,20 +92,72 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
         # --- inference ---------------------------------------------------
         await _set_stage(db, task_id, STAGE_INFERENCE)
         load_model(settings.MODEL_PATH)
-        out = predict_saliency(img)
+
+        device = asset.get("viewport_device") or default_device(img.width, img.height)
+        tiles = slice_viewports(img, device)
+        image_rgb = np.array(img, dtype=np.uint8)
+
+        if len(tiles) == 1:
+            out = predict_saliency(img)
+            saliency = out.saliency
+            overlay_bgr = out.overlay_bgr
+            inference_ms = out.inference_time_ms
+            per_viewport: list[ViewportScore] = []
+        else:
+            # A scrolling page is scored one screen at a time, because nobody
+            # sees it all at once and the model cannot see it all at once
+            # either. Segmenting BEFORE inference is the whole point: the
+            # whole-page saliency map is derived from a sliver of the input, so
+            # there is no signal in it left to partition afterwards.
+            maps: list[tuple[Viewport, np.ndarray]] = []
+            per_viewport = []
+            inference_ms = 0
+            for vp in tiles:
+                vout = predict_saliency(vp.image)
+                inference_ms += vout.inference_time_ms
+                maps.append((vp, vout.saliency))
+                vm = analyse(vout.saliency, np.array(vp.image, dtype=np.uint8))
+                per_viewport.append(ViewportScore(
+                    index=vp.index, top=vp.top, bottom=vp.bottom,
+                    clarity_score=vm.clarity_score,
+                    focus_index=vm.focus_index,
+                    clutter_index=vm.clutter_index,
+                ))
+            saliency = stitch_saliency(maps, img.width, img.height)
+            overlay_bgr = build_overlay(img, saliency)
+            logger.info("Segmented %s into %d %s viewports", asset_id, len(tiles), device)
 
         # --- analytics ---------------------------------------------------
         await _set_stage(db, task_id, STAGE_ANALYTICS)
-        image_rgb = np.array(img, dtype=np.uint8)
-        metrics = analyse(out.saliency, image_rgb)
+        # Focus Order, the replay and the region grid all come off the stitched
+        # map, so their coordinates stay in the uploaded page's pixel space and
+        # the numbered dots land where the user can see them.
+        metrics = analyse(saliency, image_rgb)
+
+        aggregate = aggregate_scores(per_viewport) if per_viewport else None
+        if aggregate is not None:
+            # The headline numbers are the per-viewport means. The whole-page
+            # values that analyse() just computed are the broken ones.
+            metrics.clarity_score = aggregate.clarity_score
+            metrics.focus_index = aggregate.focus_index
+            metrics.clutter_index = aggregate.clutter_index
+
+        # Scoreability is a property of the frame's shape. A segmented page is
+        # judged on its viewports; an unsegmentable shape (an ultra-wide export)
+        # is judged on the whole frame and may simply be unscoreable.
+        scoreable = (is_scoreable(tiles[0].image.width, tiles[0].image.height)
+                     if per_viewport else is_scoreable(img.width, img.height))
+        if not scoreable:
+            logger.warning("Asset %s is %dx%d: too little signal after letterboxing",
+                           asset_id, img.width, img.height)
 
         # --- persist artefacts -------------------------------------------
         await _set_stage(db, task_id, STAGE_PERSISTING)
         overlay_key = storage.tenant_key(user_id, "results", f"{asset_id}_heatmap.png")
         saliency_key = storage.tenant_key(user_id, "results", f"{asset_id}_saliency.npy")
 
-        heatmap_url = storage.save_bytes(overlay_key, _encode_png(out.overlay_bgr), "image/png")
-        saliency_url = storage.save_npy(saliency_key, out.saliency)
+        heatmap_url = storage.save_bytes(overlay_key, _encode_png(overlay_bgr), "image/png")
+        saliency_url = storage.save_npy(saliency_key, saliency)
 
         result = HeatmapResult(
             result_id=new_id(),
@@ -110,8 +171,13 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
             region_saliency=metrics.region_saliency,
             focus_nodes=[n.as_dict() for n in metrics.focus_nodes],
             scanpath_nodes=[n.as_dict() for n in metrics.scanpath_nodes],
+            viewport_device=device if per_viewport else "",
+            viewport_count=len(tiles),
+            viewports=[v.as_dict() for v in per_viewport],
+            weakest_viewport=aggregate.weakest_index if aggregate else None,
+            score_in_range=scoreable,
             model_version=settings.MODEL_VERSION,
-            inference_time_ms=out.inference_time_ms,
+            inference_time_ms=inference_ms,
         )
         doc = result.to_mongo()
         doc["storage_keys"] = {"heatmap": overlay_key, "saliency": saliency_key}
@@ -131,8 +197,8 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
                       "stage": STAGE_COMPLETE,
                       "completed_at": datetime.now(timezone.utc)}},
         )
-        logger.info("Analysis complete asset=%s clarity=%.2f in %dms",
-                    asset_id, metrics.clarity_score, out.inference_time_ms)
+        logger.info("Analysis complete asset=%s clarity=%.2f over %d viewport(s) in %dms",
+                    asset_id, metrics.clarity_score, len(tiles), inference_ms)
         return result.result_id
 
     except Exception as exc:  # noqa: BLE001 - failures are recorded, not raised

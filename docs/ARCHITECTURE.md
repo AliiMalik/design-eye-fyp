@@ -65,6 +65,7 @@ screen in **one** provider call. See "Multi-screen flows" below.
 | `app/services/pdf.py` | ReportLab result and comparison reports |
 | `app/services/scanpath.py` | replay frame compositing, GIF and MP4 encoding, PDF contact sheet |
 | `app/services/quota.py` | the daily LLM allowance, shared by both reviewers |
+| `app/services/viewports.py` | scroll-aware segmentation: slice a long page, stitch the saliency back |
 | `app/api/v1/batches.py` | multi-page fan-out, batch progress, the single batched flow review |
 | `app/workers/` | Celery app; loads the model once per worker process |
 
@@ -119,6 +120,27 @@ meaningless. Constants and their calibration live in `docs/DEVIATIONS.md` §4.
 Focus Order: light Gaussian blur → iterative non-maximum suppression at
 `max(20px, 8% of the long side)` → top 5 peaks ranked by intensity, in original
 pixel coordinates, no duplicates.
+
+---
+
+## Scroll-aware scoring
+
+A full-page export has an aspect ratio nobody views at once, and the letterbox
+makes that fatal rather than merely inaccurate: at 15:1 the page occupies **6.2%**
+of the model's 224×224 input, and the 512px edge grid collapses to 33×512. Both
+score terms clamp and the Clarity Score is forced to 0.0 for every such page.
+
+`services/viewports.py` therefore slices a page taller than `SEGMENT_TRIGGER`
+viewports into overlapping viewport-shaped tiles **before inference** — the
+whole-page saliency map is derived from that sliver, so there is nothing left in
+it to partition afterwards. Each tile runs the ordinary single-screen path; the
+headline score is the mean, and the per-viewport breakdown is reported alongside.
+
+The tiles' saliency is stitched back into a full-page map with a linear feather
+across the overlaps, and Focus Order, the replay and the region grid all read from
+that stitched map. This keeps every coordinate in the uploaded page's pixel space,
+so nothing downstream needs to know segmentation happened. See
+`docs/DEVIATIONS.md` §19.
 
 ---
 

@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     # the PDF itself is never stored -- only the rasterised pages are.
     MAX_PDF_UPLOAD_MB: int = 20
     MAX_IMAGE_LONG_SIDE: int = 8000
+    # A full-page export is legitimately enormous down one axis -- seven phone
+    # screens at 900px wide is 13650px tall. Capping the LONG side at 8000
+    # rejected exactly the uploads viewport segmentation exists to handle, and it
+    # was a poor proxy for cost anyway: 900x13650 is 12M pixels, while the
+    # permitted 8000x8000 is 64M. The short side and the total pixel count
+    # (Image.MAX_IMAGE_PIXELS) are the limits that actually bound the work.
+    MAX_SCROLL_LONG_SIDE: int = 30000
 
     # --- llm ---
     LLM_PROVIDER: str = "mock"

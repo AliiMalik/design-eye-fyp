@@ -23,12 +23,16 @@ export function ClarityGauge({
   const circumference = 2 * Math.PI * radius;
   const band = clarityBand(score);
 
+  // Only the arc is animated. The number is rendered straight from the prop,
+  // because a count-up driven by requestAnimationFrame reads 0.0 anywhere frames
+  // do not run -- a hidden tab, a print, a screenshot harness. A stalled sweep
+  // is cosmetic; a headline score frozen at 0.0 is a wrong answer, and 0.0 is
+  // plausible enough that nobody would question it.
   const progress = useMotionValue(0);
   const dashOffset = useTransform(
     progress,
     (v) => circumference - (v / 100) * circumference,
   );
-  const display = useTransform(progress, (v) => v.toFixed(1));
 
   useEffect(() => {
     const controls = animate(progress, score, {
@@ -63,12 +67,12 @@ export function ClarityGauge({
       </svg>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
+        <span
           className="tabular font-display font-bold leading-none"
           style={{ fontSize: size * 0.26, color: band.hex }}
         >
-          {display}
-        </motion.span>
+          {score.toFixed(1)}
+        </span>
         <span className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[var(--color-faint)]">
           / 100
         </span>

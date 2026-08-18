@@ -19,6 +19,7 @@ from app.services.images import (
 )
 from app.services.jobs import enqueue_analysis
 from app.services.storage import get_storage
+from app.services.viewports import VIEWPORT_ASPECTS, default_device
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["upload"])
@@ -32,6 +33,7 @@ async def upload_mockup(
     db: DbDep,
     file: UploadFile = File(...),
     project_id: str | None = Form(default=None),
+    viewport_device: str | None = Form(default=None),
 ) -> UploadResponse:
     """Accept a mockup, store it, and queue analysis.
 
@@ -44,6 +46,16 @@ async def upload_mockup(
         image, fmt = load_image(raw)
     except UnsupportedFileError as exc:
         raise bad_request(str(exc)) from exc
+
+    # Which screen size a scrolling page is scored against. Stored on the
+    # asset so a rerun reproduces the same segmentation.
+    device = (viewport_device or "").strip().lower()
+    if device and device not in VIEWPORT_ASPECTS:
+        raise bad_request(
+            f"Unknown screen size. Expected one of "
+            f"{', '.join(sorted(VIEWPORT_ASPECTS))}."
+        )
+    device = device or default_device(image.width, image.height)
 
     # No project supplied: fall back to a per-user default project.
     if project_id:
@@ -70,6 +82,7 @@ async def upload_mockup(
         width=image.width,
         height=image.height,
         status=AssetStatus.PENDING,
+        viewport_device=device,
     )
 
     # Everything downstream reads a PNG, so SVG/PDF are persisted rasterised.

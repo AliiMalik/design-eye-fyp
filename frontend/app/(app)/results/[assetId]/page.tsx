@@ -123,6 +123,9 @@ export default function ResultPage() {
   }
 
   const band = clarityBand(result.clarity_score);
+  // A page taller than one screen was scored a screenful at a time, so the
+  // headline number is an average and needs to say so.
+  const isScrolling = result.viewport_count > 1 && result.viewports.length > 0;
   const regions = Object.entries(result.region_saliency);
   const maxRegion = Math.max(...regions.map(([, v]) => v), 0.0001);
   const totalIntensity =
@@ -324,15 +327,27 @@ export default function ResultPage() {
                 </div>
 
                 <p className="mt-5 text-center text-[13px] font-semibold">
-                  Overall Clarity Score
+                  {isScrolling ? "Average across the page" : "Overall Clarity Score"}
                 </p>
                 <p className="mt-2 text-center text-[13px] leading-relaxed text-[var(--color-muted)]">
-                  {result.clarity_score >= 75
-                    ? "Attention concentrates cleanly. The layout creates a clear entry point."
-                    : result.clarity_score >= 40
-                      ? "Attention is workable but spread. Some elements compete for the first fixation."
-                      : "Attention is scattered across a visually dense layout. Consider consolidating."}
+                  {isScrolling
+                    ? `This design is longer than one screen, so each screenful was scored on its own and averaged. Screen ${result.weakest_viewport} needs attention first.`
+                    : result.clarity_score >= 75
+                      ? "Attention concentrates cleanly. The layout creates a clear entry point."
+                      : result.clarity_score >= 40
+                        ? "Attention is workable but spread. Some elements compete for the first fixation."
+                        : "Attention is scattered across a visually dense layout. Consider consolidating."}
                 </p>
+
+                {!result.score_in_range ? (
+                  <div className="mt-5 rounded-xl bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/20">
+                    <p className="text-[12.5px] leading-relaxed text-amber-900 dark:text-amber-200">
+                      This image is an unusual shape, so there is not enough detail
+                      left to score it reliably. Treat the number with caution and
+                      upload the design one screen at a time.
+                    </p>
+                  </div>
+                ) : null}
 
                 <dl className="mt-7 space-y-3 border-t border-[var(--color-hairline)] pt-5">
                   {[
@@ -356,6 +371,64 @@ export default function ResultPage() {
               </div>
             </Bezel>
           </Reveal>
+
+          {isScrolling ? (
+            <Reveal delay={0.08}>
+              <Bezel>
+                <div className="p-7">
+                  <h2 className="font-display text-[15px] font-semibold">
+                    Screen by screen
+                  </h2>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-muted)]">
+                    Nobody sees a long page all at once, so we score one screenful
+                    at a time as you scroll down.
+                  </p>
+
+                  <ol className="mt-5 space-y-2">
+                    {result.viewports.map((vp) => {
+                      const vband = clarityBand(vp.clarity_score);
+                      const weakest = vp.index === result.weakest_viewport;
+                      return (
+                        <li
+                          key={vp.index}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl px-3 py-2.5 ring-1",
+                            weakest
+                              ? "bg-red-50 ring-red-200 dark:bg-red-500/10 dark:ring-red-400/20"
+                              : "bg-[var(--color-surface-2)] ring-[var(--color-hairline)]",
+                          )}
+                        >
+                          <span className="tabular w-5 shrink-0 text-[12px] font-semibold text-[var(--color-muted)]">
+                            {vp.index}
+                          </span>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-shell)]">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.max(2, vp.clarity_score)}%`,
+                                backgroundColor: vband.hex,
+                              }}
+                            />
+                          </div>
+                          <span
+                            className="tabular w-11 shrink-0 text-right text-[12.5px] font-semibold"
+                            style={{ color: vband.hex }}
+                          >
+                            {vp.clarity_score.toFixed(1)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+
+                  <p className="mt-4 text-[11.5px] leading-relaxed text-[var(--color-faint)]">
+                    Screen height assumed from a {result.viewport_device}. Screens
+                    overlap slightly so nothing that straddles a fold gets missed.
+                  </p>
+                </div>
+              </Bezel>
+            </Reveal>
+          ) : null}
 
           <Reveal delay={0.1}>
             <Bezel>

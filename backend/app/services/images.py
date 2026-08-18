@@ -200,11 +200,19 @@ def load_image(data: bytes, fmt: AssetFormat | None = None) -> tuple[Image.Image
             f"The file could not be read as an image. Supported: {SUPPORTED_LABEL}."
         ) from exc
 
-    long_side = max(img.size)
-    if long_side > settings.MAX_IMAGE_LONG_SIDE:
+    # Width and length are bounded separately. A scrolling page is legitimately
+    # very long, so only its narrow axis is held to the ordinary limit.
+    if min(img.size) > settings.MAX_IMAGE_LONG_SIDE:
         raise UnsupportedFileError(
-            f"Image is too large ({img.width}x{img.height}). "
-            f"The longest side must be at most {settings.MAX_IMAGE_LONG_SIDE}px."
+            f"This design is {img.width}x{img.height}, which is too big to "
+            f"analyse. Its shorter side needs to be under "
+            f"{settings.MAX_IMAGE_LONG_SIDE}px."
+        )
+    if max(img.size) > settings.MAX_SCROLL_LONG_SIDE:
+        raise UnsupportedFileError(
+            f"This design is {img.width}x{img.height}, which is longer than we "
+            f"can analyse. Split it up, or keep the longer side under "
+            f"{settings.MAX_SCROLL_LONG_SIDE}px."
         )
     if img.width < 16 or img.height < 16:
         raise UnsupportedFileError("Image is too small to analyse (minimum 16x16).")

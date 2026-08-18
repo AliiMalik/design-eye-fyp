@@ -22,6 +22,7 @@ from app.schemas.analysis import (
     ResultResponse,
     ScanpathStep,
     StatusResponse,
+    ViewportSchema,
 )
 from app.schemas.common import MessageResponse
 from app.services.analytics import FocusNodeData, scanpath_timeline
@@ -77,6 +78,11 @@ def _result_response(asset: dict, result: dict) -> ResultResponse:
         image_height=asset.get("height", 0),
         original_filename=asset.get("original_filename", ""),
         project_id=asset.get("project_id", ""),
+        viewport_device=result.get("viewport_device", ""),
+        viewport_count=int(result.get("viewport_count", 1) or 1),
+        viewports=[ViewportSchema(**v) for v in result.get("viewports", [])],
+        weakest_viewport=result.get("weakest_viewport"),
+        score_in_range=bool(result.get("score_in_range", True)),
     )
 
 

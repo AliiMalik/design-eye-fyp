@@ -103,6 +103,19 @@ TC-09 pins focus_nodes at exactly 5. Timing lives only in
 `analytics.scanpath_timeline()` so the player, the video, and the PDF filmstrip
 cannot disagree.
 
+**A long page is segmented BEFORE inference, never after.** The letterbox is why:
+at 15:1 the page fills 6.2% of the model's 224×224 input and the rest is padding,
+so the whole-page saliency map is derived from a 14px sliver. Computing focus per
+band on that map would be cheaper than N forward passes and completely worthless
+-- there is no signal in it to partition. `services/viewports.py` slices first.
+
+**Scoreability is a geometry test, not a clamp test.** `focus_raw` clamping at
+`FOCUS_RAW_MIN` together with `clutter` clamping at 1.0 does *not* mean the score
+is unreliable: `synth_data_table` and `synth_dense_dashboard` both look exactly
+like that and score 0.00 correctly, and TC-08 depends on it. Only the frame's
+shape distinguishes unmeasurable from awful, so `letterbox_content_fraction`
+drives `score_in_range`.
+
 **A flow is reviewed in ONE provider call, never one per screen.** Per-screen
 calls exhaust the free daily quota in two uploads and, worse, cannot compare
 screens -- each call would only ever see its own numbers, so "clarity drops most
@@ -154,7 +167,7 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 124 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 150 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 

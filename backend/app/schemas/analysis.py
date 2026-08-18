@@ -87,6 +87,17 @@ class ScanpathStep(BaseModel):
     end_ms: int
 
 
+class ViewportSchema(BaseModel):
+    """One screen's worth of a scrolling page, with its own score."""
+
+    index: int
+    top: int
+    bottom: int
+    clarity_score: float
+    focus_index: float
+    clutter_index: float
+
+
 class ResultResponse(BaseModel):
     result_id: str
     asset_id: str
@@ -107,6 +118,14 @@ class ResultResponse(BaseModel):
     image_height: int = 0
     original_filename: str = ""
     project_id: str = ""
+    # Scroll-aware scoring. viewport_count == 1 means the upload fitted one
+    # screen and was scored whole; above that, clarity_score is the mean of the
+    # per-viewport scores listed here.
+    viewport_device: str = ""
+    viewport_count: int = 1
+    viewports: list[ViewportSchema] = Field(default_factory=list)
+    weakest_viewport: int | None = None
+    score_in_range: bool = True
 
 
 class StatusResponse(BaseModel):

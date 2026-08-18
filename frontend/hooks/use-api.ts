@@ -174,15 +174,18 @@ export function useUpload() {
     mutationFn: async ({
       file,
       projectId,
+      viewportDevice,
       onProgress,
     }: {
       file: File;
       projectId?: string;
+      viewportDevice?: string;
       onProgress?: (pct: number) => void;
     }) => {
       const form = new FormData();
       form.append("file", file);
       if (projectId) form.append("project_id", projectId);
+      if (viewportDevice) form.append("viewport_device", viewportDevice);
       const { data } = await api.post<UploadResponse>("/upload", form, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => {

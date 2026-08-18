@@ -29,6 +29,23 @@ const MAX_MB = 10;
 // MAX_UPLOAD_MB / MAX_PDF_UPLOAD_MB in backend/app/config.py.
 const MAX_PDF_MB = 20;
 const limitFor = (ext: string) => (ext === "pdf" ? MAX_PDF_MB : MAX_MB);
+
+// Mirrors VIEWPORT_ASPECTS / SEGMENT_TRIGGER in backend/app/services/viewports.py.
+// A page taller than this many screens is scored one screenful at a time.
+const VIEWPORT_ASPECTS: Record<string, number> = {
+  phone: 19.5 / 9,
+  tablet: 4 / 3,
+  desktop: 10 / 16,
+};
+const SEGMENT_TRIGGER = 1.35;
+const DEVICE_LABELS: Record<string, string> = {
+  phone: "Phone",
+  tablet: "Tablet",
+  desktop: "Desktop",
+};
+
+const viewportsTall = (w: number, h: number, device: string) =>
+  h / (Math.max(1, w) * VIEWPORT_ASPECTS[device]);
 const EASE = [0.32, 0.72, 0, 1] as const;
 
 function UploadFlow() {
@@ -50,6 +67,8 @@ function UploadFlow() {
   // page 1 only, so the API reports the real count and we offer batch analysis
   // rather than quietly discarding the rest.
   const [multiPage, setMultiPage] = useState<number | null>(null);
+  const [device, setDevice] = useState("phone");
+  const [scrolls, setScrolls] = useState(false);
 
   const { status, timedOut, elapsedMs } = useTaskPolling(taskId);
 
@@ -77,16 +96,35 @@ function UploadFlow() {
       return;
     }
     setFile(chosen);
-    setPreview(
-      ["png", "jpg", "jpeg", "webp"].includes(ext) ? URL.createObjectURL(chosen) : null,
-    );
+    const url = ["png", "jpg", "jpeg", "webp"].includes(ext)
+      ? URL.createObjectURL(chosen)
+      : null;
+    setPreview(url);
+
+    // Measure the image so we only ask about screen size when it can matter.
+    // A design that already fits one screen is scored whole either way.
+    setScrolls(false);
+    if (url) {
+      const probe = new window.Image();
+      probe.onload = () => {
+        const guess = probe.width > probe.height ? "desktop" : "phone";
+        setDevice(guess);
+        setScrolls(viewportsTall(probe.width, probe.height, guess) >= SEGMENT_TRIGGER);
+      };
+      probe.src = url;
+    }
   }, []);
 
   const start = () => {
     if (!file) return;
     setUploadPct(0);
     upload.mutate(
-      { file, projectId: projectId || undefined, onProgress: setUploadPct },
+      {
+        file,
+        projectId: projectId || undefined,
+        viewportDevice: scrolls ? device : undefined,
+        onProgress: setUploadPct,
+      },
       {
         onSuccess: (data) => {
           if (data.pages_detected > data.pages_analysed) {
@@ -293,6 +331,37 @@ function UploadFlow() {
                     </motion.div>
                   ) : null}
                 </AnimatePresence>
+
+                {/* Only asked when the design is longer than one screen -- for a
+                    single screen the answer changes nothing. */}
+                {scrolls ? (
+                  <div className="mt-6 rounded-2xl bg-[var(--color-surface-2)] p-4 ring-1 ring-[var(--color-hairline)]">
+                    <p className="text-[13px] font-medium text-[var(--color-ink)]">
+                      This design is longer than one screen
+                    </p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--color-muted)]">
+                      Nobody sees it all at once, so we score one screenful at a
+                      time and average the results. Which screen should we assume?
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {Object.keys(VIEWPORT_ASPECTS).map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setDevice(key)}
+                          className={cn(
+                            "rounded-full px-3.5 py-1.5 text-[12.5px] font-medium transition-colors",
+                            device === key
+                              ? "bg-[var(--color-primary)] text-white"
+                              : "bg-[var(--color-surface)] text-[var(--color-muted)] ring-1 ring-[var(--color-hairline)] hover:text-[var(--color-ink)]",
+                          )}
+                        >
+                          {DEVICE_LABELS[key]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {file && file.name.toLowerCase().endsWith(".pdf") ? (
                   <div className="mt-6 flex items-start gap-3 rounded-2xl bg-indigo-50/70 p-4 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:ring-indigo-400/20">
