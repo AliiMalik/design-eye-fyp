@@ -42,6 +42,7 @@ from app.services.images import (
     encode_png,
     load_pdf_pages,
     sniff_format,
+    validate_size,
 )
 from app.services.jobs import enqueue_analysis
 from app.services.llm import generate_flow_suggestions
@@ -102,6 +103,12 @@ async def upload_batch(
             "Batch analysis expects a multi-page PDF. Upload single images "
             "through the normal upload instead."
         )
+
+    # Before counting: a rejected upload should never be parsed first.
+    try:
+        validate_size(raw, fmt)
+    except UnsupportedFileError as exc:
+        raise bad_request(str(exc)) from exc
 
     detected = count_pdf_pages(raw)
     try:

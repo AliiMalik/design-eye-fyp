@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     MODEL_PATH: str = "app/ml/weights/stage3_ui_best_val.pth"
     MODEL_VERSION: str = "stage3-ui-v1"
     MAX_UPLOAD_MB: int = 10
+    # A real multi-screen Figma export runs well past 10MB, and unlike an image
+    # the PDF itself is never stored -- only the rasterised pages are.
+    MAX_PDF_UPLOAD_MB: int = 20
     MAX_IMAGE_LONG_SIDE: int = 8000
 
     # --- llm ---
@@ -83,9 +86,8 @@ class Settings(BaseSettings):
         """CORS allow-list; never '*' (BUILD.md section 9)."""
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
-    @property
-    def max_upload_bytes(self) -> int:
-        return self.MAX_UPLOAD_MB * 1024 * 1024
+    # The byte ceilings live in services/images.size_limit_mb(), which picks one
+    # per format. Two properties here would just be a second place to disagree.
 
 
 @lru_cache

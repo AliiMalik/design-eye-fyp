@@ -40,8 +40,13 @@ refused, and adds a case that a **text file renamed to `.png` is still rejected*
 since content type is sniffed from magic bytes and the filename is never trusted.
 See `tests/test_upload_and_inference.py::test_tc04_*`.
 
-Validation retained: 10 MB ceiling (TC-05), long side capped at 8000 px, minimum
-16×16, and a decompression-bomb guard.
+Validation retained: 10 MB ceiling for images (TC-05), **20 MB for PDFs** — a
+genuine multi-screen export is routinely larger than any one mockup, and unlike
+an image the PDF is never stored, only the pages rasterised out of it. The
+ceiling is chosen from the *sniffed* format, never the filename — so a PDF
+renamed `.png` still gets the PDF allowance, which is the same property TC-04
+relies on. Long side capped at 8000 px, minimum 16×16, and a decompression-bomb
+guard.
 
 ---
 
@@ -259,7 +264,7 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, Cloudinary resource-type addressing, and the LLM adapter's
-retry behaviour. **120 tests, all passing.**
+retry behaviour. **124 tests, all passing.**
 
 ---
 
@@ -389,7 +394,7 @@ with no API key, which is the default.
 a page per screen. Heatmaps are downscaled before embedding -- full-resolution
 embeds produced a 21MB report for eight screens, now under 1MB.
 
-Covered by `tests/test_batches.py` (24 tests).
+Covered by `tests/test_batches.py` (28 tests).
 
 **Plain language in generated copy.** The first live flow review came back
 reading like a metrics dump: *"clutter_index of 0.8011"*, *"Fixation rank 1

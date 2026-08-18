@@ -464,3 +464,57 @@ def test_pdf_labels_the_metric_basis():
     # An unknown value must still render as words, never as snake_case.
     assert "_" not in _basis({"based_on": "some_new_metric"})
     assert _basis({}) == ""
+
+
+# --- size ceilings ---------------------------------------------------------
+def test_pdf_gets_a_larger_ceiling_than_an_image():
+    """A real multi-screen export is routinely bigger than any one mockup."""
+    from app.config import settings
+    from app.models.domain import AssetFormat
+    from app.services.images import UnsupportedFileError, size_limit_mb, validate_size
+
+    assert settings.MAX_PDF_UPLOAD_MB > settings.MAX_UPLOAD_MB
+    assert size_limit_mb(AssetFormat.PDF) == settings.MAX_PDF_UPLOAD_MB
+    assert size_limit_mb(AssetFormat.PNG) == settings.MAX_UPLOAD_MB
+    assert size_limit_mb(None) == settings.MAX_UPLOAD_MB
+
+    # Between the two ceilings: fine as a PDF, refused as an image.
+    between = b"x" * ((settings.MAX_UPLOAD_MB + 1) * 1024 * 1024)
+    validate_size(between, AssetFormat.PDF)
+    with pytest.raises(UnsupportedFileError, match=str(settings.MAX_UPLOAD_MB)):
+        validate_size(between, AssetFormat.PNG)
+
+    too_big = b"x" * ((settings.MAX_PDF_UPLOAD_MB + 1) * 1024 * 1024)
+    with pytest.raises(UnsupportedFileError, match=str(settings.MAX_PDF_UPLOAD_MB)):
+        validate_size(too_big, AssetFormat.PDF)
+
+
+@pytest.mark.slow
+async def test_batch_accepts_a_pdf_over_the_image_ceiling(client, user):
+    """The whole point of the raise: a real Figma export gets through."""
+    from app.config import settings
+
+    pdf = make_pdf(4)
+    # Pad past the image ceiling without disturbing the PDF structure: trailing
+    # bytes after %%EOF are ignored by every reader.
+    padding = (settings.MAX_UPLOAD_MB + 2) * 1024 * 1024 - len(pdf)
+    fat = pdf + b"\n% " + b"0" * max(0, padding)
+    assert len(fat) > settings.MAX_UPLOAD_MB * 1024 * 1024
+    assert len(fat) < settings.MAX_PDF_UPLOAD_MB * 1024 * 1024
+
+    resp = await client.post("/upload/batch", headers=user["headers"],
+                             files={"file": ("big-flow.pdf", fat, "application/pdf")})
+    assert resp.status_code == 202, resp.text
+    assert resp.json()["page_count"] == 4
+
+
+@pytest.mark.slow
+async def test_batch_rejects_a_pdf_over_the_pdf_ceiling(client, user):
+    from app.config import settings
+
+    pdf = make_pdf(2)
+    fat = pdf + b"\n% " + b"0" * ((settings.MAX_PDF_UPLOAD_MB + 1) * 1024 * 1024)
+    resp = await client.post("/upload/batch", headers=user["headers"],
+                             files={"file": ("huge.pdf", fat, "application/pdf")})
+    assert resp.status_code == 400
+    assert str(settings.MAX_PDF_UPLOAD_MB) in resp.json()["detail"]

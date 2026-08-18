@@ -60,6 +60,7 @@ services:
       MODEL_PATH: app/ml/weights/stage3_ui_best_val.pth
       MODEL_VERSION: stage3-ui-v1
       MAX_UPLOAD_MB: "10"
+      MAX_PDF_UPLOAD_MB: "20"
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       LLM_MODEL: ${LLM_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

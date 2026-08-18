@@ -125,7 +125,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-120 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+124 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -165,10 +165,14 @@ of your daily allowance instead of twelve, and because the model sees all the
 screens together it can actually compare them — "clarity drops most at screen 5"
 is not something twelve separate requests could ever say.
 
-Up to 30 screens per upload. **Export flow PDF** gives you one report for the
-whole thing. A single-image upload works exactly as before; if you upload a
-multi-page PDF through the normal route it still analyses page one, but now it
-tells you how many screens it found and offers to analyse them all.
+Up to 30 screens and 20MB per upload — a PDF gets double the image ceiling,
+because a real multi-screen export is routinely larger than any single mockup
+and the PDF itself is never stored, only the pages rasterised out of it.
+**Export flow PDF** gives you one report for the whole thing.
+
+A single-image upload works exactly as before; if you upload a multi-page PDF
+through the normal route it still analyses page one, but now it tells you how
+many screens it found and offers to analyse them all.
 
 ---
 
@@ -182,7 +186,8 @@ tells you how many screens it found and offers to analyse them all.
 | `JWT_SECRET` | — | **generate a real one** |
 | `STORAGE_BACKEND` | `local` | or `cloudinary` |
 | `LLM_PROVIDER` | `mock` | `anthropic` \| `openai` \| `gemini` \| `mock` \| `none` |
-| `MAX_UPLOAD_MB` | `10` | |
+| `MAX_UPLOAD_MB` | `10` | images |
+| `MAX_PDF_UPLOAD_MB` | `20` | PDFs; the file itself is never stored, only its pages |
 | `CORS_ORIGINS` | `http://localhost:3000` | explicit allow-list, never `*` |
 
 ### Enabling real AI suggestions
@@ -238,6 +243,11 @@ Set these in the root `.env` before `docker compose up -d --build`:
 | `DEV_MODE=false` | routes inference through the Celery worker so the API thread is never occupied by a forward pass |
 | `INSTALL_LLM_SDKS=true` | if using a real LLM provider |
 
+**Check your host's request body limit.** A 20MB flow PDF is a large multipart
+upload, and several PaaS platforms cap request bodies below that at their edge —
+you would get a 413 from the proxy before FastAPI ever sees the file. Uvicorn
+itself imposes no limit, so this only bites behind a managed proxy.
+
 `NEXT_PUBLIC_API_URL` is the one that catches people out: Next inlines
 `NEXT_PUBLIC_*` at build time, so a running container cannot pick up a new value
 from the environment. Rebuild the frontend image when it changes.
@@ -252,7 +262,7 @@ docker compose exec api python -m app.seed --reset
 Verify the storage backend before trusting it with real data:
 
 ```bash
-.venv\Scripts\python.exe scriptserify_cloudinary.py
+.venv/Scripts/python scripts/verify_cloudinary.py
 ```
 
 ---

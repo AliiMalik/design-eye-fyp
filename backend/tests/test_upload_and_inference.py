@@ -57,12 +57,19 @@ async def test_tc04_raster_formats_are_accepted(client, user):
 
 
 async def test_tc05_oversize_file_rejected(client, user):
-    """TC-05: a file above the 10MB ceiling is refused."""
-    oversized = b"\x89PNG\r\n\x1a\n" + b"\x00" * (11 * 1024 * 1024)
+    """TC-05: an image above the ceiling is refused.
+
+    Derived from settings rather than hardcoded, so raising a limit cannot
+    silently turn this into a test that asserts nothing.
+    """
+    from app.config import settings
+
+    over = settings.MAX_UPLOAD_MB * 1024 * 1024 + 1024
+    oversized = b"\x89PNG\r\n\x1a\n" + b"\x00" * over
     resp = await client.post("/upload", headers=user["headers"],
                              files={"file": ("huge.png", oversized, "image/png")})
     assert resp.status_code == 400
-    assert "10mb" in resp.json()["detail"].lower()
+    assert f"{settings.MAX_UPLOAD_MB}mb" in resp.json()["detail"].lower()
 
 
 async def test_empty_file_rejected(client, user):

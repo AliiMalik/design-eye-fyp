@@ -58,14 +58,25 @@ def sniff_format(data: bytes) -> AssetFormat:
     )
 
 
-def validate_size(data: bytes) -> None:
-    """Enforce the upload size ceiling."""
+def size_limit_mb(fmt: AssetFormat | None = None) -> int:
+    """The ceiling that applies to this format.
+
+    A PDF gets more headroom than an image: a genuine multi-screen export is
+    routinely larger than any single mockup, and the PDF is never stored -- only
+    the pages rasterised out of it are.
+    """
+    if fmt == AssetFormat.PDF:
+        return max(settings.MAX_PDF_UPLOAD_MB, settings.MAX_UPLOAD_MB)
+    return settings.MAX_UPLOAD_MB
+
+
+def validate_size(data: bytes, fmt: AssetFormat | None = None) -> None:
+    """Enforce the upload size ceiling for this format."""
     if not data:
         raise UnsupportedFileError("Uploaded file is empty.")
-    if len(data) > settings.max_upload_bytes:
-        raise UnsupportedFileError(
-            f"File size exceeds {settings.MAX_UPLOAD_MB}MB limit."
-        )
+    limit_mb = size_limit_mb(fmt)
+    if len(data) > limit_mb * 1024 * 1024:
+        raise UnsupportedFileError(f"File size exceeds {limit_mb}MB limit.")
 
 
 def _rasterise_svg(data: bytes) -> Image.Image:
@@ -102,7 +113,7 @@ def load_pdf_pages(data: bytes, limit: int = MAX_PDF_PAGES) -> list[Image.Image]
     ``load_image`` deliberately returns only page 1 to keep the single-upload
     contract; this is the fan-out path used by batch upload.
     """
-    validate_size(data)
+    validate_size(data, AssetFormat.PDF)
     try:
         import fitz  # PyMuPDF
     except ImportError as exc:
@@ -165,8 +176,12 @@ def load_image(data: bytes, fmt: AssetFormat | None = None) -> tuple[Image.Image
     Returns ``(image, detected_format)``. Raises UnsupportedFileError with a
     client-safe message on anything we cannot process.
     """
-    validate_size(data)
+    # Sniff before measuring: the ceiling depends on the real format, and the
+    # filename is never trusted to tell us what that is.
+    if not data:
+        raise UnsupportedFileError("Uploaded file is empty.")
     fmt = fmt or sniff_format(data)
+    validate_size(data, fmt)
 
     try:
         if fmt == AssetFormat.SVG:

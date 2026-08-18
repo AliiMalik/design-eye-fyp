@@ -25,6 +25,10 @@ import { STAGE_LABELS, STAGE_ORDER, cn, formatBytes } from "@/lib/utils";
 
 const ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.pdf";
 const MAX_MB = 10;
+// A real multi-screen export runs well past the image ceiling. Mirrors
+// MAX_UPLOAD_MB / MAX_PDF_UPLOAD_MB in backend/app/config.py.
+const MAX_PDF_MB = 20;
+const limitFor = (ext: string) => (ext === "pdf" ? MAX_PDF_MB : MAX_MB);
 const EASE = [0.32, 0.72, 0, 1] as const;
 
 function UploadFlow() {
@@ -67,8 +71,9 @@ function UploadFlow() {
       toast.error("Unsupported file. Use PNG, JPG, JPEG, WEBP, SVG, or PDF.");
       return;
     }
-    if (chosen.size > MAX_MB * 1024 * 1024) {
-      toast.error(`File size exceeds the ${MAX_MB}MB limit.`);
+    const limit = limitFor(ext);
+    if (chosen.size > limit * 1024 * 1024) {
+      toast.error(`File size exceeds the ${limit}MB limit for ${ext.toUpperCase()}.`);
       return;
     }
     setFile(chosen);
@@ -212,7 +217,8 @@ function UploadFlow() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-[12px] text-[var(--color-muted)]">
                     Supported: <span className="font-medium">PNG, JPG, WEBP, SVG, PDF</span>{" "}
-                    · Max size: <span className="font-medium">{MAX_MB}MB</span>
+                    · Max size: <span className="font-medium">{MAX_MB}MB</span>, or{" "}
+                    <span className="font-medium">{MAX_PDF_MB}MB</span> for a PDF
                   </p>
                   <Badge tone="neutral">stage3-ui-v1</Badge>
                 </div>
