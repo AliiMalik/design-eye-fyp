@@ -57,6 +57,11 @@ class UploadResponse(BaseModel):
     asset_id: str
     task_id: str
     status: str = "pending"
+    # Additive, so TC-03's contract is untouched. A multi-page PDF analysed as a
+    # single screen must not look like a complete result: the UI reads these to
+    # offer batch analysis instead of silently dropping the other pages.
+    pages_detected: int = 1
+    pages_analysed: int = 1
 
 
 class ProjectDetailResponse(BaseModel):
@@ -210,6 +215,76 @@ class SuggestionsResponse(BaseModel):
     model_name: str = ""
     created_at: datetime | None = None
 
+
+# --- batches (multi-screen upload) ---------------------------------------
+class BatchScreen(BaseModel):
+    asset_id: str
+    page_number: int
+    original_filename: str
+    status: str
+    mockup_url: str = ""
+    heatmap_url: str | None = None
+    clarity_score: float | None = None
+    focus_index: float | None = None
+    clutter_index: float | None = None
+    width: int = 0
+    height: int = 0
+    suggestions: list[SuggestionItemSchema] = Field(default_factory=list)
+    headline: str = ""
+
+
+class BatchUploadResponse(BaseModel):
+    """202 Accepted for POST /upload/batch."""
+
+    batch_id: str
+    project_id: str
+    page_count: int
+    pages_skipped: int = 0
+    task_ids: list[str] = Field(default_factory=list)
+    status: str = "processing"
+
+
+class BatchResponse(BaseModel):
+    batch_id: str
+    project_id: str
+    source_filename: str
+    page_count: int
+    pages_skipped: int = 0
+    status: str
+    created_at: datetime
+    screens: list[BatchScreen] = Field(default_factory=list)
+    # Progress, derived from the child tasks rather than stored.
+    screens_complete: int = 0
+    screens_failed: int = 0
+    avg_clarity_score: float | None = None
+    weakest_screen: int | None = None
+    strongest_screen: int | None = None
+    flow_summary: str = ""
+    llm_status: str | None = None
+    llm_provider: str = ""
+    llm_model: str = ""
+
+
+class BatchListItem(BaseModel):
+    batch_id: str
+    project_id: str
+    source_filename: str
+    page_count: int
+    status: str
+    created_at: datetime
+    avg_clarity_score: float | None = None
+
+
+class BatchListResponse(BaseModel):
+    batches: list[BatchListItem]
+    total_count: int
+    page: int
+    limit: int
+
+
+class BatchSuggestionsRequest(BaseModel):
+    user_context: str | None = Field(default=None, max_length=1000)
+    regenerate: bool = False
 
 # --- dashboard -----------------------------------------------------------
 class ClarityTrendPoint(BaseModel):

@@ -81,6 +81,71 @@ export interface UploadResponse {
   asset_id: string;
   task_id: string;
   status: string;
+  /** A multi-page PDF analysed as one screen reports the real page count here. */
+  pages_detected: number;
+  pages_analysed: number;
+}
+
+export interface BatchScreen {
+  asset_id: string;
+  page_number: number;
+  original_filename: string;
+  status: string;
+  mockup_url: string;
+  heatmap_url: string | null;
+  clarity_score: number | null;
+  focus_index: number | null;
+  clutter_index: number | null;
+  width: number;
+  height: number;
+  suggestions: Suggestion[];
+  headline: string;
+}
+
+export interface BatchUploadResponse {
+  batch_id: string;
+  project_id: string;
+  page_count: number;
+  pages_skipped: number;
+  task_ids: string[];
+  status: string;
+}
+
+export interface Batch {
+  batch_id: string;
+  project_id: string;
+  source_filename: string;
+  page_count: number;
+  pages_skipped: number;
+  status: "processing" | "complete" | "partial" | "failed";
+  created_at: string;
+  screens: BatchScreen[];
+  screens_complete: number;
+  screens_failed: number;
+  avg_clarity_score: number | null;
+  weakest_screen: number | null;
+  strongest_screen: number | null;
+  flow_summary: string;
+  llm_status: string | null;
+  llm_provider: string;
+  llm_model: string;
+}
+
+export interface BatchListItem {
+  batch_id: string;
+  project_id: string;
+  source_filename: string;
+  page_count: number;
+  status: string;
+  created_at: string;
+  avg_clarity_score: number | null;
+}
+
+export interface BatchListResponse {
+  batches: BatchListItem[];
+  total_count: number;
+  page: number;
+  limit: number;
 }
 
 /** One step of the predicted viewing order, with its timing on the playback. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Eye, FolderPlus, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ArrowUpRight, Eye, FolderPlus, Layers, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -19,6 +19,7 @@ import {
   StaggerItem,
 } from "@/components/ui/primitives";
 import {
+  useBatches,
   useCreateProject,
   useDeleteResult,
   useProjects,
@@ -46,6 +47,7 @@ export default function ProjectsPage() {
 
   const { data, isLoading } = useResults(page, PAGE_SIZE);
   const { data: projectData } = useProjects(1, 100);
+  const { data: batchData } = useBatches(1, 6);
   const createProject = useCreateProject();
   const rerun = useRerun();
   const remove = useDeleteResult();
@@ -173,6 +175,47 @@ export default function ProjectsPage() {
           </div>
         </Bezel>
       </Reveal>
+
+      {/* --- multi-screen flows --- */}
+      {(batchData?.batches.length ?? 0) > 0 ? (
+        <Reveal>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+              <Layers size={17} strokeWidth={1.5} className="text-indigo-600" />
+              Multi-screen flows
+            </h2>
+            <span className="text-[12px] text-[var(--color-muted)]">
+              {batchData?.total_count} total
+            </span>
+          </div>
+          <Stagger className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {batchData?.batches.map((b) => (
+              <StaggerItem key={b.batch_id}>
+                <Link href={`/batches/${b.batch_id}`}>
+                  <Bezel className="h-full transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5">
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="truncate font-display text-[14.5px] font-semibold">
+                          {b.source_filename}
+                        </p>
+                        <Badge tone={b.status === "complete" ? "success" : "warning"}>
+                          {b.status}
+                        </Badge>
+                      </div>
+                      <p className="tabular mt-2 text-[12px] text-[var(--color-faint)]">
+                        {b.page_count} screens · {formatDate(b.created_at)}
+                      </p>
+                      <div className="mt-3">
+                        <ClarityPill score={b.avg_clarity_score} />
+                      </div>
+                    </div>
+                  </Bezel>
+                </Link>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </Reveal>
+      ) : null}
 
       {/* --- filters --- */}
       <Reveal>

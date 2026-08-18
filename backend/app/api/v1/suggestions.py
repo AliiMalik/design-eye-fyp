@@ -7,7 +7,6 @@ A slow or dead provider never blocks or invalidates the core analysis.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
@@ -22,6 +21,7 @@ from app.schemas.analysis import (
     SuggestionsResponse,
 )
 from app.services.llm import generate_suggestions
+from app.services.quota import consume_llm_quota
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["suggestions"])
@@ -34,17 +34,6 @@ def _to_response(doc: dict) -> SuggestionsResponse:
         llm_status=doc.get("llm_status", "ok"), provider=doc.get("provider", ""),
         model_name=doc.get("model_name", ""), created_at=doc.get("created_at"),
     )
-
-
-async def _rate_limited(db, user_id: str) -> bool:
-    """Per-user daily cap, counted in Mongo."""
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    doc = await db[Collections.LLM_USAGE].find_one_and_update(
-        {"user_id": user_id, "day": day},
-        {"$inc": {"count": 1}},
-        upsert=True, return_document=True,
-    )
-    return int((doc or {}).get("count", 0)) > settings.LLM_RATE_LIMIT_PER_DAY
 
 
 async def _load_result(db, asset_id: str, user_id: str) -> dict:
@@ -83,7 +72,7 @@ async def create_suggestions(asset_id: str, payload: SuggestionsRequest,
     if cached and not payload.regenerate:
         return _to_response(cached)
 
-    if await _rate_limited(db, user["user_id"]):
+    if await consume_llm_quota(db, user["user_id"]):
         logger.info("LLM daily rate limit hit for user %s", user["user_id"])
         return SuggestionsResponse(
             result_id=result_id, llm_status=LLMStatus.RATE_LIMITED.value,

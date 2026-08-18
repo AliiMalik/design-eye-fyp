@@ -9,9 +9,14 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, status
 from app.core.deps import CurrentUser, DbDep, get_owned_project
 from app.core.errors import bad_request, server_error
 from app.db.mongo import Collections
-from app.models.domain import AssetStatus, MockupAsset, Project
+from app.models.domain import AssetFormat, AssetStatus, MockupAsset, Project
 from app.schemas.analysis import UploadResponse
-from app.services.images import UnsupportedFileError, encode_png, load_image
+from app.services.images import (
+    UnsupportedFileError,
+    count_pdf_pages,
+    encode_png,
+    load_image,
+)
 from app.services.jobs import enqueue_analysis
 from app.services.storage import get_storage
 
@@ -79,6 +84,18 @@ async def upload_mockup(
     await db[Collections.MOCKUP_ASSETS].insert_one(dict(asset.to_mongo()))
     task_id = await enqueue_analysis(db, background, asset.asset_id, user["user_id"])
 
+    # load_image() deliberately rasterises page 1 only. Report the true page
+    # count so the client can offer batch analysis rather than the user being
+    # told a 12-screen PDF is fully analysed.
+    pages_detected = count_pdf_pages(raw) if fmt == AssetFormat.PDF else 1
+    pages_detected = max(1, pages_detected)
+    if pages_detected > 1:
+        logger.info("Upload %s is a %d-page PDF; analysed page 1 only",
+                    asset.asset_id, pages_detected)
+
     logger.info("Upload accepted asset=%s project=%s format=%s %dx%d",
                 asset.asset_id, project_id, fmt.value, image.width, image.height)
-    return UploadResponse(asset_id=asset.asset_id, task_id=task_id, status="pending")
+    return UploadResponse(
+        asset_id=asset.asset_id, task_id=task_id, status="pending",
+        pages_detected=pages_detected, pages_analysed=1,
+    )

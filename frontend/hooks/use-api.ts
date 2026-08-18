@@ -11,6 +11,9 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type {
   AnalysisResult,
+  Batch,
+  BatchListResponse,
+  BatchUploadResponse,
   Comparison,
   ComparisonListResponse,
   DashboardStats,
@@ -36,6 +39,8 @@ export const qk = {
   suggestions: (assetId: string) => ["suggestions", assetId] as const,
   comparisons: (page: number) => ["comparisons", page] as const,
   comparison: (id: string) => ["comparison", id] as const,
+  batches: (page: number) => ["batches", page] as const,
+  batch: (id: string) => ["batch", id] as const,
 };
 
 // --- reads -----------------------------------------------------------------
@@ -318,4 +323,79 @@ export function useTaskPolling(taskId: string | null): PollState {
   }, [elapsedMs, query.data?.status, taskId, timedOut]);
 
   return { status: query.data ?? null, timedOut, elapsedMs };
+}
+
+// --- batches (multi-screen flows) ------------------------------------------
+export function useBatches(page = 1, limit = 20) {
+  return useQuery({
+    queryKey: qk.batches(page),
+    queryFn: async () =>
+      (await api.get<BatchListResponse>("/batches", { params: { page, limit } })).data,
+  });
+}
+
+/** Polls while screens are still analysing, then settles. */
+export function useBatch(batchId: string) {
+  return useQuery({
+    queryKey: qk.batch(batchId),
+    queryFn: async () => (await api.get<Batch>(`/batches/${batchId}`)).data,
+    enabled: Boolean(batchId),
+    refetchInterval: (q) => {
+      const data = q.state.data as Batch | undefined;
+      return data && data.status !== "processing" ? false : 2500;
+    },
+  });
+}
+
+export function useUploadBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      file,
+      projectTitle,
+      onProgress,
+    }: {
+      file: File;
+      projectTitle?: string;
+      onProgress?: (pct: number) => void;
+    }) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (projectTitle) form.append("project_title", projectTitle);
+      const { data } = await api.post<BatchUploadResponse>("/upload/batch", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+        },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["batches"] });
+      void qc.invalidateQueries({ queryKey: ["results"] });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+/** One provider call reviews every screen; see backend generate_flow_suggestions. */
+export function useBatchSuggestions(batchId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { user_context?: string; regenerate?: boolean }) =>
+      (await api.post<Batch>(`/batches/${batchId}/suggestions`, body)).data,
+    onSuccess: (data) => qc.setQueryData(qk.batch(batchId), data),
+  });
+}
+
+export function useDeleteBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (batchId: string) => (await api.delete(`/batches/${batchId}`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["batches"] });
+      void qc.invalidateQueries({ queryKey: ["results"] });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
 }

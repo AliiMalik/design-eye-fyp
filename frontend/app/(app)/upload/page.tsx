@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   FileImage,
+  Layers,
   Loader2,
   UploadCloud,
   X,
@@ -18,7 +19,7 @@ import { toast } from "sonner";
 import { Bezel } from "@/components/ui/bezel";
 import { Button } from "@/components/ui/button";
 import { Badge, Eyebrow, Reveal } from "@/components/ui/primitives";
-import { useProjects, useTaskPolling, useUpload } from "@/hooks/use-api";
+import { useProjects, useTaskPolling, useUpload, useUploadBatch } from "@/hooks/use-api";
 import { apiErrorMessage } from "@/lib/api";
 import { STAGE_LABELS, STAGE_ORDER, cn, formatBytes } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ function UploadFlow() {
   const router = useRouter();
   const params = useSearchParams();
   const upload = useUpload();
+  const uploadBatch = useUploadBatch();
   const { data: projectData } = useProjects(1, 100);
 
   const [file, setFile] = useState<File | null>(null);
@@ -40,6 +42,10 @@ function UploadFlow() {
   const [taskId, setTaskId] = useState<string | null>(params.get("task"));
   const [assetId, setAssetId] = useState<string | null>(params.get("asset"));
   const inputRef = useRef<HTMLInputElement>(null);
+  // A multi-page PDF is a whole flow, not one screen. load_image() rasterises
+  // page 1 only, so the API reports the real count and we offer batch analysis
+  // rather than quietly discarding the rest.
+  const [multiPage, setMultiPage] = useState<number | null>(null);
 
   const { status, timedOut, elapsedMs } = useTaskPolling(taskId);
 
@@ -78,6 +84,10 @@ function UploadFlow() {
       { file, projectId: projectId || undefined, onProgress: setUploadPct },
       {
         onSuccess: (data) => {
+          if (data.pages_detected > data.pages_analysed) {
+            // Do not pretend a 12-screen PDF was fully analysed.
+            setMultiPage(data.pages_detected);
+          }
           setTaskId(data.task_id);
           setAssetId(data.asset_id);
         },
@@ -92,6 +102,20 @@ function UploadFlow() {
     setTaskId(null);
     setAssetId(null);
     setUploadPct(0);
+    setMultiPage(null);
+  };
+
+  const startBatch = () => {
+    if (!file) return;
+    setUploadPct(0);
+    uploadBatch.mutate(
+      { file, onProgress: setUploadPct },
+      {
+        onSuccess: (data) => router.push(`/batches/${data.batch_id}`),
+        onError: (error) =>
+          toast.error(apiErrorMessage(error, "Could not analyse every screen.")),
+      },
+    );
   };
 
   const activeStageIndex = useMemo(() => {
@@ -101,6 +125,7 @@ function UploadFlow() {
   }, [status, upload.isPending]);
 
   const failed = status?.status === "failed" || timedOut;
+  const isPdf = Boolean(file?.name.toLowerCase().endsWith(".pdf"));
 
   return (
     <div className="mx-auto max-w-[46rem] space-y-8">
@@ -263,16 +288,58 @@ function UploadFlow() {
                   ) : null}
                 </AnimatePresence>
 
-                <Button
-                  size="lg"
-                  variant="primary"
-                  className="mt-7 w-full"
-                  disabled={!file || upload.isPending}
-                  onClick={start}
-                  trailingIcon={<ArrowRight size={16} strokeWidth={1.5} />}
-                >
-                  {upload.isPending ? `Uploading ${uploadPct}%` : "Analyse design"}
-                </Button>
+                {file && file.name.toLowerCase().endsWith(".pdf") ? (
+                  <div className="mt-6 flex items-start gap-3 rounded-2xl bg-indigo-50/70 p-4 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:ring-indigo-400/20">
+                    <Layers
+                      size={17}
+                      strokeWidth={1.5}
+                      className="mt-0.5 shrink-0 text-indigo-600 dark:text-indigo-300"
+                    />
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--color-ink)]">
+                        Is this a multi-screen export?
+                      </p>
+                      <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--color-muted)]">
+                        A PDF exported from Figma often holds a whole flow.
+                        &ldquo;Analyse every screen&rdquo; scores each one and reviews
+                        the whole journey together, using a single AI request rather
+                        than one per screen.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    size="lg"
+                    variant={isPdf ? "outline" : "primary"}
+                    className="w-full"
+                    disabled={!file || upload.isPending || uploadBatch.isPending}
+                    onClick={start}
+                    trailingIcon={<ArrowRight size={16} strokeWidth={1.5} />}
+                  >
+                    {upload.isPending
+                      ? `Uploading ${uploadPct}%`
+                      : isPdf
+                        ? "Analyse first screen"
+                        : "Analyse mockup"}
+                  </Button>
+
+                  {isPdf ? (
+                    <Button
+                      size="lg"
+                      variant="primary"
+                      className="w-full"
+                      disabled={upload.isPending || uploadBatch.isPending}
+                      onClick={startBatch}
+                      trailingIcon={<Layers size={15} strokeWidth={1.5} />}
+                    >
+                      {uploadBatch.isPending
+                        ? `Uploading ${uploadPct}%`
+                        : "Analyse every screen"}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </Bezel>
           </motion.div>
@@ -354,6 +421,38 @@ function UploadFlow() {
                     );
                   })}
                 </ol>
+
+                {multiPage && multiPage > 1 ? (
+                  <div className="mt-6 flex items-start gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/20">
+                    <Layers
+                      size={17}
+                      strokeWidth={1.5}
+                      className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+                    />
+                    <div>
+                      <p className="text-[13px] font-medium text-amber-900 dark:text-amber-200">
+                        This PDF has {multiPage} screens — only the first was analysed.
+                      </p>
+                      <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800/90 dark:text-amber-200/80">
+                        Score all {multiPage} together and review the whole journey in
+                        one AI request.
+                      </p>
+                      {/* The file is still staged, so this is one click, not a
+                          re-pick and a second wait. */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3"
+                        disabled={uploadBatch.isPending}
+                        onClick={startBatch}
+                      >
+                        {uploadBatch.isPending
+                          ? `Uploading ${uploadPct}%`
+                          : `Analyse all ${multiPage} screens`}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {failed ? (
                   <div className="mt-7 flex items-start gap-3 rounded-2xl bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-500/10 dark:ring-red-400/20">

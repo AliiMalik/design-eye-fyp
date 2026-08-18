@@ -28,6 +28,12 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
     await db[Collections.MOCKUP_ASSETS].create_index(
         [("user_id", ASCENDING), ("uploaded_at", DESCENDING)])
 
+    await db[Collections.MOCKUP_ASSETS].create_index([("batch_id", ASCENDING)])
+
+    await db[Collections.BATCHES].create_index([("batch_id", ASCENDING)], unique=True)
+    await db[Collections.BATCHES].create_index(
+        [("user_id", ASCENDING), ("created_at", DESCENDING)])
+
     await db[Collections.HEATMAP_RESULTS].create_index([("asset_id", ASCENDING)], unique=True)
     await db[Collections.HEATMAP_RESULTS].create_index([("result_id", ASCENDING)], unique=True)
     await db[Collections.HEATMAP_RESULTS].create_index([("user_id", ASCENDING)])

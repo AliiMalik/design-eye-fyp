@@ -92,6 +92,33 @@ class Project(MongoModel):
     updated_at: datetime = Field(default_factory=utcnow)
 
 
+class BatchStatus(str, Enum):
+    PROCESSING = "processing"
+    COMPLETE = "complete"
+    PARTIAL = "partial"   # some screens failed, the rest are usable
+    FAILED = "failed"
+
+
+class ScreenBatch(MongoModel):
+    """One multi-screen upload: a PDF fanned out into N assets."""
+
+    batch_id: str = Field(default_factory=new_id)
+    user_id: str
+    project_id: str
+    source_filename: str
+    page_count: int
+    pages_skipped: int = 0
+    status: BatchStatus = BatchStatus.PROCESSING
+    # Populated by the single batched LLM call.
+    flow_summary: str = ""
+    weakest_screen: int | None = None
+    strongest_screen: int | None = None
+    llm_status: LLMStatus | None = None
+    llm_provider: str = ""
+    llm_model: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class MockupAsset(MongoModel):
     asset_id: str = Field(default_factory=new_id)
     project_id: str
@@ -99,6 +126,9 @@ class MockupAsset(MongoModel):
     file_url: str
     storage_key: str
     original_filename: str
+    # Set only for screens that came from a multi-page upload.
+    batch_id: str | None = None
+    page_number: int | None = None
     format: AssetFormat
     file_size_kb: int
     width: int = 0                           # addition

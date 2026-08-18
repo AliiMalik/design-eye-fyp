@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 SVG_RASTER_SCALE = 2.0
 PDF_RASTER_DPI = 150
+# A Figma "export frames to PDF" can carry dozens of screens. Cap the fan-out so
+# one upload cannot pin a worker for minutes.
+MAX_PDF_PAGES = 30
 Image.MAX_IMAGE_PIXELS = 200_000_000  # guard against decompression bombs
 
 
@@ -75,6 +78,65 @@ def _rasterise_svg(data: bytes) -> Image.Image:
         ) from exc
     png_bytes = cairosvg.svg2png(bytestring=data, scale=SVG_RASTER_SCALE)
     return Image.open(io.BytesIO(png_bytes)).convert("RGB")
+
+
+def count_pdf_pages(data: bytes) -> int:
+    """Page count, or 0 when the bytes are not a readable PDF."""
+    try:
+        import fitz
+    except ImportError:
+        return 0
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except Exception:  # noqa: BLE001 - a malformed PDF is simply not countable
+        return 0
+    try:
+        return int(doc.page_count)
+    finally:
+        doc.close()
+
+
+def load_pdf_pages(data: bytes, limit: int = MAX_PDF_PAGES) -> list[Image.Image]:
+    """Rasterise every page of a multi-screen PDF, in document order.
+
+    ``load_image`` deliberately returns only page 1 to keep the single-upload
+    contract; this is the fan-out path used by batch upload.
+    """
+    validate_size(data)
+    try:
+        import fitz  # PyMuPDF
+    except ImportError as exc:
+        raise UnsupportedFileError(
+            "PDF rasterisation is unavailable on this server. "
+            "Export the screens as PNG and upload them individually."
+        ) from exc
+
+    doc = fitz.open(stream=data, filetype="pdf")
+    try:
+        if doc.page_count == 0:
+            raise UnsupportedFileError("PDF contains no pages.")
+
+        pages: list[Image.Image] = []
+        for index in range(min(doc.page_count, limit)):
+            pix = doc.load_page(index).get_pixmap(dpi=PDF_RASTER_DPI)
+            page = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+
+            long_side = max(page.size)
+            if long_side > settings.MAX_IMAGE_LONG_SIDE:
+                scale = settings.MAX_IMAGE_LONG_SIDE / float(long_side)
+                page = page.resize(
+                    (max(1, int(page.width * scale)), max(1, int(page.height * scale))),
+                    Image.LANCZOS,
+                )
+            if page.width < 16 or page.height < 16:
+                continue  # blank or degenerate page, nothing to analyse
+            pages.append(page)
+
+        if not pages:
+            raise UnsupportedFileError("No analysable pages found in this PDF.")
+        return pages
+    finally:
+        doc.close()
 
 
 def _rasterise_pdf(data: bytes) -> Image.Image:

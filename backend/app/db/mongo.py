@@ -20,6 +20,7 @@ class Collections:
     MOCKUP_ASSETS = "mockup_assets"
     HEATMAP_RESULTS = "heatmap_results"
     AB_COMPARISONS = "ab_comparisons"
+    BATCHES = "batches"
     INFERENCE_TASKS = "inference_tasks"
     SUGGESTIONS = "suggestions"
     REFRESH_DENYLIST = "refresh_denylist"
