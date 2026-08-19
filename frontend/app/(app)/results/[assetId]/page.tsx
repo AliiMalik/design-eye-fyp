@@ -210,14 +210,19 @@ export default function ResultPage() {
           <Bezel>
             <div className="p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex rounded-full bg-[var(--color-shell)] p-1">
+                {/* Five tabs are wider than a phone. Left unconstrained they
+                    pushed the whole page into horizontal scroll at 375px; now
+                    the strip scrolls within itself and the body never does.
+                    min-w-0 is required or the flex child refuses to shrink. */}
+                <div className="-mx-1 flex min-w-0 max-w-full snap-x overflow-x-auto rounded-full bg-[var(--color-shell)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {MODES.map((m) => (
                     <button
                       key={m.key}
                       type="button"
                       onClick={() => setMode(m.key)}
                       className={cn(
-                        "rounded-full px-3.5 py-1.5 text-[12.5px] font-medium",
+                        "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5",
+                        "text-[12.5px] font-medium",
                         "transition-all duration-400 ease-[cubic-bezier(0.32,0.72,0,1)]",
                         mode === m.key
                           ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-ambient)]"

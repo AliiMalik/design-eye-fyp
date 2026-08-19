@@ -343,7 +343,7 @@ export default function ProjectsPage() {
                       type="button"
                       aria-label="Delete analysis"
                       onClick={() => {
-                        if (!window.confirm(`Delete "${row.original_filename}"?`)) return;
+                        if (!window.confirm(`Delete "${row.original_filename}" and its analysis? This cannot be undone.`)) return;
                         remove.mutate(row.asset_id, {
                           onSuccess: () => toast.success("Deleted."),
                           onError: () => toast.error("Could not delete."),

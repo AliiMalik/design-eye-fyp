@@ -76,6 +76,13 @@ export default function DashboardPage() {
     );
   }
 
+  // A brand-new account has analysed nothing, and an average over nothing is not
+  // zero -- it is absent. Showing "0.0 / Needs work" told first-time users their
+  // work scored badly before they had uploaded any, which is both false and
+  // discouraging. The projects page already used an em dash for this; the two
+  // now agree.
+  const hasScores = data.total_analyses > 0;
+
   const stats = [
     {
       label: "Total projects",
@@ -93,8 +100,8 @@ export default function DashboardPage() {
     },
     {
       label: "Avg. clarity score",
-      value: data.avg_clarity_score.toFixed(1),
-      note: clarityBand(data.avg_clarity_score).label,
+      value: hasScores ? data.avg_clarity_score.toFixed(1) : "—",
+      note: hasScores ? clarityBand(data.avg_clarity_score).label : "no analyses yet",
       icon: CheckCircle2,
       tone: "violet" as const,
     },
@@ -116,11 +123,15 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <Eyebrow>Dashboard</Eyebrow>
+            {/* "Welcome back" greeted people who had never been here, and
+                promised insights that did not exist yet. */}
             <h1 className="mt-4 font-display text-[2.1rem] font-bold tracking-[-0.028em] sm:text-[2.5rem]">
-              Welcome back, {firstName}
+              {hasScores ? `Welcome back, ${firstName}` : `Welcome, ${firstName}`}
             </h1>
             <p className="mt-2 text-[14.5px] text-[var(--color-muted)]">
-              Your design insights are synchronised and ready for review.
+              {hasScores
+                ? "Your design insights are ready for review."
+                : "Upload a mockup and DesignEye will show you where people look first."}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

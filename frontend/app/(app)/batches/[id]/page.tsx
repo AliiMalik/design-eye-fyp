@@ -149,7 +149,7 @@ export default function BatchPage() {
               size="sm"
               variant="outline"
               onClick={() => {
-                if (!window.confirm(`Delete this flow and all ${batch.page_count} screens?`))
+                if (!window.confirm(`Delete this flow and all ${batch.page_count} screens? This cannot be undone.`))
                   return;
                 remove.mutate(batchId, {
                   onSuccess: () => {

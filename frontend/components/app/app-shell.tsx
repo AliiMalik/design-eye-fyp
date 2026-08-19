@@ -117,6 +117,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-[100dvh]">
+      {/* Without this a keyboard user tabs through all six sidebar links and the
+          account menu before reaching the page, on every single navigation.
+          Visually hidden until focused, which is the point. */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-[var(--color-primary)] focus:px-4 focus:py-2.5 focus:text-[13px] focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-white"
+      >
+        Skip to main content
+      </a>
+
       <aside className="fixed inset-y-0 left-0 hidden w-[15.5rem] lg:block">{sidebar}</aside>
 
       <AnimatePresence>
@@ -170,7 +180,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-8 sm:px-7 sm:py-10">{children}</main>
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-8 sm:px-7 sm:py-10">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -164,6 +164,32 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 // --- inputs ----------------------------------------------------------------
+/**
+ * Ties a Field's label and error message to whichever control it wraps.
+ *
+ * Context rather than cloneElement, because the control is not always the
+ * direct child -- the password fields nest an input beside a show/hide button,
+ * and cloning would put the id on the wrapper div instead.
+ */
+const FieldContext = React.createContext<{
+  id?: string;
+  describedBy?: string;
+  invalid?: boolean;
+}>({});
+
+function useFieldProps(props: {
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: React.AriaAttributes["aria-invalid"];
+}) {
+  const field = React.useContext(FieldContext);
+  return {
+    id: props.id ?? field.id,
+    "aria-describedby": props["aria-describedby"] ?? field.describedBy,
+    "aria-invalid": props["aria-invalid"] ?? (field.invalid ? true : undefined),
+  };
+}
+
 export const Input = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
@@ -180,6 +206,7 @@ export const Input = React.forwardRef<
       className,
     )}
     {...props}
+    {...useFieldProps(props)}
   />
 ));
 Input.displayName = "Input";
@@ -198,6 +225,7 @@ export const Textarea = React.forwardRef<
       className,
     )}
     {...props}
+    {...useFieldProps(props)}
   />
 ));
 Textarea.displayName = "Textarea";
@@ -215,14 +243,34 @@ export function Field({
   children: React.ReactNode;
   className?: string;
 }) {
+  // The label was previously rendered without htmlFor and the control arrives as
+  // children, so every form in the app was announced as an unnamed edit box.
+  // One id, generated here, wires the label, the error text and the control.
+  const id = React.useId();
+  const errorId = `${id}-error`;
+
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-baseline justify-between gap-3">
-        <label className="text-[13px] font-medium text-[var(--color-ink)]">{label}</label>
-        {hint}
+    <FieldContext.Provider
+      value={{ id, describedBy: error ? errorId : undefined, invalid: Boolean(error) }}
+    >
+      <div className={cn("space-y-2", className)}>
+        <div className="flex items-baseline justify-between gap-3">
+          <label
+            htmlFor={id}
+            className="text-[13px] font-medium text-[var(--color-ink)]"
+          >
+            {label}
+          </label>
+          {hint}
+        </div>
+        {children}
+        {/* role="alert" so a validation failure is announced, not just shown. */}
+        {error ? (
+          <p id={errorId} role="alert" className="text-xs text-red-500">
+            {error}
+          </p>
+        ) : null}
       </div>
-      {children}
-      {error ? <p className="text-xs text-red-500">{error}</p> : null}
-    </div>
+    </FieldContext.Provider>
   );
 }

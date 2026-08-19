@@ -7,9 +7,11 @@ import { Logo, ThemeToggle } from "@/components/brand";
 import { Reveal } from "@/components/ui/primitives";
 
 const TRUST = [
-  { icon: ShieldCheck, label: "Tenant-isolated storage" },
-  { icon: Activity, label: "Sub-second inference" },
-  { icon: Lock, label: "bcrypt + JWT sessions" },
+  // These sit on the sign-in screen, where the reader is a designer deciding
+  // whether to trust the product -- not an engineer reviewing the stack.
+  { icon: ShieldCheck, label: "Your designs stay private" },
+  { icon: Activity, label: "Results in seconds" },
+  { icon: Lock, label: "Secure sign-in" },
 ];
 
 /** Centred card on a plain field, matching the Visily auth screens. */

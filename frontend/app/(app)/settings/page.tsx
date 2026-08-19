@@ -202,7 +202,7 @@ export default function SettingsPage() {
               Security &amp; access
             </h2>
             <p className="mt-1.5 text-[13px] text-[var(--color-muted)]">
-              Passwords are hashed with bcrypt (cost 12) and never stored in plain text.
+              Your password is stored scrambled, so nobody — including us — can read it.
             </p>
 
             <Field
@@ -316,9 +316,9 @@ export default function SettingsPage() {
                 { k: "API status", v: health?.status ?? "unknown" },
                 { k: "Model loaded", v: health?.model_loaded ? "yes" : "no" },
                 { k: "Database", v: health?.db ? "connected" : "unavailable" },
-                { k: "Redis broker", v: health?.redis ? "connected" : "not required (dev mode)" },
+                { k: "Job queue", v: health?.redis ? "connected" : "not required" },
                 { k: "Model version", v: String(health?.model_info?.model_version ?? "—") },
-                { k: "Checkpoint", v: String(health?.model_info?.checkpoint_version ?? "—") },
+                { k: "Model build", v: String(health?.model_info?.checkpoint_version ?? "—") },
                 { k: "Device", v: String(health?.model_info?.device ?? "—") },
                 { k: "API version", v: health?.version ?? "—" },
               ].map((row) => (
