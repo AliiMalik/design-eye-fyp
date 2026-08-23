@@ -55,7 +55,7 @@ screen in **one** provider call. See "Multi-screen flows" below.
 | `app/core/errors.py` | client-safe error constructors |
 | `app/ml/model.py` | **locked** SalGAN architecture — never edit |
 | `app/ml/preprocess.py` | letterbox + the inverse transform |
-| `app/ml/inference.py` | singleton loader, predict, JET overlay |
+| `app/ml/inference.py` | singleton loader, predict, JET overlay; splits tall frames into near-square bands so the square input is not wasted |
 | `app/ml/theme.py` | dark-mode detection and the brightened copy fed to the model |
 | `app/services/analytics.py` | Clarity Score, Focus Order, region grid |
 | `app/services/images.py` | format sniffing, rasterisation, validation |

@@ -264,7 +264,7 @@ All SDS endpoints are implemented; these are additive.
 
 Plus letterbox alignment across five aspect ratios, peak-localisation, overlay
 legibility, Cloudinary resource-type addressing, and the LLM adapter's
-retry behaviour. **160 tests, all passing.**
+retry behaviour. **169 tests, all passing.**
 
 ---
 
@@ -535,3 +535,68 @@ and the UI says plainly that a brightened copy was used. Recovery is partial:
 37.40 -> 79.98 against a light equivalent's 89.28.
 
 Covered by `tests/test_theme.py` (10 tests).
+
+---
+
+## 21. Aspect-aware inference (addition beyond the SDS)
+
+Found while checking the product against an independent estimate on two mobile
+screens. Both scored far lower than they should, and the cause turned out to be
+their **shape**, not their design.
+
+**The evidence.** Measured across all 22 screens available in `inputs/` plus two
+reconstructions, aspect ratio correlates with the Clarity Score at
+**Spearman -0.730**:
+
+| aspect (h/w) | screens | clarity |
+|---|---|---|
+| 0.53 - 0.74 (desktop) | 8 | 73 - 98 |
+| 0.88 - 1.10 (square) | 5 | 46 - 71 |
+| 2.21 - 2.75 (phone) | 3 | **15 - 39** |
+
+The same pixels reshaped confirm it is the frame and not the content: squashing
+the messages screen to 1:1 raises `focus_raw` from 0.0560 to 0.0875, and
+stretching `real_login` from its native 0.74 to 2.75 drops focus from 0.918 to
+0.498.
+
+**The mechanism.** The model's input is a fixed 224x224 **square**. After
+letterboxing, a 2.75:1 phone screen occupies 81x224 of it -- the model sees the
+design 81 pixels wide. Coarse saliency is diffuse saliency, entropy rises, and
+the focus term collapses. `focus_raw` tracks the fill fraction monotonically:
+
+| aspect | model sees | `focus_raw` |
+|---|---|---|
+| 1.00 | 224x224 (100%) | 0.0875 |
+| 2.20 | 101x224 (45%) | 0.0619 |
+| 2.75 | 81x224 (36%) | 0.0560 |
+
+**The fix.** `predict_saliency_hires` in `ml/inference.py` splits a frame taller
+than `MIN_TILED_ASPECT` (1.5) into near-square bands, runs each through the
+model, and reassembles them. Measured: messages screen **14.82 -> 31.45**,
+Soul Match login **38.69 -> 49.15**.
+
+Details that matter:
+
+- **This is a resolution technique, not a perceptual claim.** The user sees the
+  whole phone screen at once, so the bands are stitched into one map and scored
+  once. That is what separates it from `services/viewports.py`, which splits a
+  *scrolling page* because nobody sees all of it at once and scores each
+  screenful separately. Long pages now get both: viewport segmentation for
+  perception, then band tiling inside each viewport for resolution.
+- **Bands are not normalised individually.** Sigmoid output is on an absolute
+  scale, so the raw values stay comparable across bands and are min-max
+  normalised once over the finished map. Normalising per band would stretch a
+  quiet band up to match a busy one, flatten the stitched map, and cost the very
+  focus the split exists to recover.
+- **Only tall frames are tiled.** The mechanism looks symmetric, but the data is
+  not: landscape screens at 53% fill still score 73-98, because landscape UI is
+  what the checkpoint was trained on. Fixing a direction that shows no harm would
+  only risk the calibration.
+- **The calibration set is bit-identical.** Every one of the 12 samples is wider
+  than 1.5:1, so all take the original single-pass path; measured maximum change
+  across the set is 0.000000, and TC-07/TC-08 are untouched.
+
+**Cost.** Two to four forward passes instead of one, on tall uploads only. At
+~250ms each this is well inside the 30s budget of TC-06.
+
+Covered by `tests/test_aspect_resolution.py` (9 tests).

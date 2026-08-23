@@ -112,6 +112,15 @@ button orange and scored worse. Only the model's INPUT is changed -- edge
 density, the overlay and every coordinate come from the original pixels, and
 `ui_theme` is recorded so the compensation is never silent.
 
+**A tall frame is split into near-square bands before inference.** The model's
+input is a fixed 224x224 square, so a 2.75:1 phone screen reaches it as 81x224 --
+the design seen 81 pixels wide. Aspect ratio correlated with the Clarity Score at
+Spearman -0.730 before this. `predict_saliency_hires` splits above
+`MIN_TILED_ASPECT` and stitches once. Bands are deliberately NOT normalised
+individually: sigmoid output is absolute, and per-band normalisation flattens the
+stitched map and destroys the focus the split recovers. Tall frames only -- every
+calibration sample is wider than 1.5:1 and must stay bit-identical.
+
 **A long page is segmented BEFORE inference, never after.** The letterbox is why:
 at 15:1 the page fills 6.2% of the model's 224×224 input and the rest is padding,
 so the whole-page saliency map is derived from a 14px sliver. Computing focus per
@@ -176,7 +185,7 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 160 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 169 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 

@@ -25,7 +25,7 @@ from app.models.domain import (
     TaskStatus,
     new_id,
 )
-from app.ml.inference import build_overlay, load_model, predict_saliency
+from app.ml.inference import build_overlay, load_model, predict_saliency_hires
 from app.ml.theme import detect_theme, for_model, mean_luminance
 from app.services.analytics import analyse
 from app.services.storage import StorageService, get_storage
@@ -109,7 +109,7 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
                         asset_id, mean_luminance(img))
 
         if len(tiles) == 1:
-            out = predict_saliency(for_model(img, dark))
+            out = predict_saliency_hires(for_model(img, dark))
             saliency = out.saliency
             # predict_saliency builds its overlay on whatever it was given, so on
             # the dark path that would be the inverted copy. The heatmap the user
@@ -127,7 +127,7 @@ async def run_inference_pipeline(db: AsyncIOMotorDatabase, task_id: str,
             per_viewport = []
             inference_ms = 0
             for vp in tiles:
-                vout = predict_saliency(for_model(vp.image, dark))
+                vout = predict_saliency_hires(for_model(vp.image, dark))
                 inference_ms += vout.inference_time_ms
                 maps.append((vp, vout.saliency))
                 vm = analyse(vout.saliency, np.array(vp.image, dtype=np.uint8))

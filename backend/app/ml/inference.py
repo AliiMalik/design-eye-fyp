@@ -136,6 +136,114 @@ def predict_saliency(img: Image.Image, model: SalGANGenerator | None = None
     )
 
 
+# --- aspect-aware inference ------------------------------------------------
+#
+# The model's input is a fixed 224x224 square, so a tall upload is letterboxed
+# into a narrow strip of it. A 2.75:1 phone screen occupies 81x224 -- the model
+# genuinely sees the design 81 pixels wide, and the saliency it returns is that
+# coarse. Coarse saliency is diffuse saliency, entropy rises, and the focus term
+# collapses.
+#
+# Measured across every screen available, aspect ratio correlates with the
+# Clarity Score at Spearman -0.730: landscape screens score 73-98, phone screens
+# 15-39. The cause is the frame, not the design -- squashing the SAME pixels to
+# square triples focus_raw (0.0560 -> 0.0875 on the messages screen), and
+# stretching a desktop screen to 2.75:1 drops it from 0.918 to 0.498.
+#
+# So a tall frame is split into near-square bands, each of which fills the
+# model's input properly, and the results are reassembled. This is a RESOLUTION
+# technique, not a perceptual claim: the user sees the whole screen at once, so
+# the bands are stitched back into one map and scored once. That is the
+# difference between this and services/viewports.py, which splits a scrolling
+# page because nobody sees all of it at once and scores each screenful.
+
+# Below this the letterbox waste is not worth a second forward pass, and it
+# keeps every calibration sample (all wider than 1.1:1) on the original path so
+# TC-07 and TC-08 are untouched.
+MIN_TILED_ASPECT = 1.5
+MAX_INFERENCE_TILES = 4
+INFERENCE_TILE_OVERLAP = 0.10
+
+
+def inference_tile_count(width: int, height: int) -> int:
+    """How many near-square bands this frame should be split into."""
+    aspect = height / float(max(1, width))
+    if aspect < MIN_TILED_ASPECT:
+        return 1
+    return max(1, min(MAX_INFERENCE_TILES, int(round(aspect))))
+
+
+def _bands(height: int, n: int) -> list[tuple[int, int]]:
+    step = height / n
+    pad = step * INFERENCE_TILE_OVERLAP
+    out = []
+    for i in range(n):
+        out.append((max(0, int(round(i * step - pad))),
+                    min(height, int(round((i + 1) * step + pad)))))
+    return out
+
+
+def predict_saliency_hires(img: Image.Image, model: SalGANGenerator | None = None
+                           ) -> SaliencyOutput:
+    """Saliency for one frame, recovering the resolution a tall frame loses.
+
+    Near-square frames take the ordinary single-pass path unchanged.
+    """
+    n = inference_tile_count(img.width, img.height)
+    if n <= 1:
+        return predict_saliency(img, model)
+
+    model = model or _model
+    if model is None:
+        raise RuntimeError("Model is not loaded; call load_model() first.")
+    device = next(model.parameters()).device
+
+    rgb = img.convert("RGB")
+    width, height = rgb.size
+    total = np.zeros((height, width), dtype=np.float32)
+    weight = np.zeros((height, width), dtype=np.float32)
+    elapsed_ms = 0
+    first_meta: LetterboxMeta | None = None
+
+    for top, bottom in _bands(height, n):
+        canvas, meta = letterbox_with_meta(rgb.crop((0, top, width, bottom)))
+        tensor = preprocess(canvas).unsqueeze(0).to(device)
+
+        start = time.perf_counter()
+        with torch.no_grad():
+            band = torch.sigmoid(model(tensor)).squeeze().cpu().numpy()
+        elapsed_ms += int((time.perf_counter() - start) * 1000)
+
+        # Deliberately NOT normalised per band. Sigmoid output is on an absolute
+        # scale, so leaving it raw keeps bands comparable; normalising each one
+        # first would stretch a quiet band up to match a busy one, flatten the
+        # stitched map and cost the very focus this is meant to recover.
+        band = unletterbox_saliency(band.astype(np.float32), meta)
+
+        rows = bottom - top
+        feather = np.ones(rows, dtype=np.float32)
+        ramp = max(1, int(rows * INFERENCE_TILE_OVERLAP))
+        if top > 0:
+            feather[:ramp] = np.linspace(0.0, 1.0, ramp, dtype=np.float32)
+        if bottom < height:
+            feather[-ramp:] = np.linspace(1.0, 0.0, ramp, dtype=np.float32)
+
+        total[top:bottom] += band * feather[:, None]
+        weight[top:bottom] += feather[:, None]
+        first_meta = first_meta or meta
+
+    np.divide(total, weight, out=total, where=weight > 1e-6)
+    saliency = minmax_normalise(total)      # once, over the whole frame
+
+    assert first_meta is not None
+    return SaliencyOutput(
+        saliency=saliency,
+        overlay_bgr=build_overlay(rgb, saliency),
+        inference_time_ms=elapsed_ms,
+        letterbox=first_meta,
+    )
+
+
 def build_overlay(img: Image.Image, saliency: np.ndarray,
                   alpha: float = HEATMAP_ALPHA) -> np.ndarray:
     """Alpha-blend a JET colormap of ``saliency`` over ``img``. Returns BGR.

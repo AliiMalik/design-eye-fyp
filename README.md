@@ -125,7 +125,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-160 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+169 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -213,6 +213,27 @@ It is a workaround, not a cure: the real fix is a model trained on dark
 interfaces. Recovery is good but partial (37.4 → 80.0 against a light
 equivalent's 89.3), so treat dark-mode scores as slightly conservative. See
 [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §20.
+
+---
+
+## Phone screens
+
+A phone screen is much taller than it is wide, and the attention model's input is
+a **square**. Left alone, a 2.75:1 screenshot reaches the model as an 81-pixel-wide
+strip — it genuinely sees your design at 81 pixels across, and the blurry result
+drags the score down for reasons that have nothing to do with your design.
+
+Measured across every screen we have, aspect ratio correlated with the Clarity
+Score at **-0.73**: desktop screens scored 73–98 while phone screens scored 15–39.
+Squashing the *same* pixels to a square shape tripled the focus reading.
+
+So DesignEye now splits a tall upload into near-square bands, runs each through
+the model, and reassembles them into one map. Your design is untouched and still
+gets a single score — it just gets looked at properly. Measured: a messages list
+went from 14.8 to 31.5, a login screen from 38.7 to 49.2.
+
+Desktop-shaped uploads are unaffected, and take exactly the path they always did.
+See [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §21.
 
 ---
 
