@@ -33,29 +33,72 @@ function explain(score, viewportCount) {
 }
 
 async function boot() {
-  const { token, apiBase } = await chrome.storage.local.get(["token", "apiBase"]);
+  const { token, apiBase, user } = await chrome.storage.local.get([
+    "token", "apiBase", "user",
+  ]);
   $("apiBase").value = apiBase || DEFAULT_API;
   $("signout").hidden = !token;
+  // The extension holds its own session, separate from the web app's. Naming
+  // the account makes a mismatch visible here rather than as a confusing
+  // "belongs to another account" after clicking through to the full analysis.
+  $("account").textContent = user?.email || "";
+  $("account").hidden = !token || !user?.email;
+  // Reset the sign-in/create toggle explicitly rather than relying on the popup
+  // being torn down between openings. Chrome does destroy it today, but state
+  // that only holds because of that is a trap for the next change.
+  setAuthMode(false);
   show(token ? "ready" : "auth");
 }
+
+// Signing up from here matters: someone handed the extension should not have to
+// find the web app first just to get an account.
+let creating = false;
+
+function setAuthMode(create) {
+  creating = create;
+  $("authError").hidden = true;
+  $("nameRow").hidden = !create;
+  $("pwHint").hidden = !create;
+  $("authLede").textContent = create
+    ? "Create an account and start analysing pages."
+    : "Sign in to analyse the page you are on.";
+  $("authSubmit").textContent = create ? "Create account" : "Sign in";
+  $("swapText").textContent = create ? "Already have an account?" : "New here?";
+  $("swapMode").textContent = create ? "Sign in" : "Create an account";
+  $("password").autocomplete = create ? "new-password" : "current-password";
+}
+
+$("swapMode").addEventListener("click", () => setAuthMode(!creating));
 
 $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("authError").hidden = true;
-  const btn = e.target.querySelector("button");
+
+  const password = $("password").value;
+  if (creating && password.length < 8) {
+    return fail($("authError"), "Use at least 8 characters for your password.");
+  }
+
+  const btn = $("authSubmit");
+  const label = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Signing in…";
+  btn.textContent = creating ? "Creating…" : "Signing in…";
 
   const res = await send({
-    type: "LOGIN",
+    type: creating ? "REGISTER" : "LOGIN",
     email: $("email").value.trim(),
-    password: $("password").value,
+    password,
+    ...(creating ? { displayName: $("displayName").value.trim() } : {}),
   });
 
   btn.disabled = false;
-  btn.textContent = "Sign in";
-  if (!res?.ok) return fail($("authError"), res?.error || "Could not sign in.");
+  btn.textContent = label;
+  if (!res?.ok) {
+    return fail($("authError"), res?.error || "That did not work.");
+  }
   $("signout").hidden = false;
+  $("account").textContent = res.data?.email || "";
+  $("account").hidden = !res.data?.email;
   show("ready");
 });
 
@@ -69,6 +112,8 @@ $("saveApi").addEventListener("click", async () => {
 $("signout").addEventListener("click", async () => {
   await send({ type: "LOGOUT" });
   $("signout").hidden = true;
+  $("account").hidden = true;
+  setAuthMode(false);
   show("auth");
 });
 
@@ -102,6 +147,12 @@ $("analyse").addEventListener("click", async () => {
   $("scoreBand").style.color = b.hex;
   $("scoreNote").textContent = explain(result.clarity_score, result.viewport_count);
   $("heatmap").src = result.heatmap_url;
+
+  // Say where it went. Captures land in a project named after the site, so this
+  // is the difference between "it worked" and "I know where to find it".
+  const site = res.data.site;
+  $("savedTo").textContent = site ? `Saved to your “${site}” project.` : "";
+  $("savedTo").hidden = !site;
 
   const { apiBase } = await chrome.storage.local.get("apiBase");
   const web = (apiBase || DEFAULT_API)

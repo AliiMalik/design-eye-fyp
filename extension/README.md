@@ -33,10 +33,23 @@ exact id rather than opening up to all extensions.
 
 1. Open any website.
 2. Click the DesignEye icon.
-3. Sign in with your DesignEye account (first time only).
+3. **Create an account** right here the first time — no need to visit the web app
+   first — or sign in if you already have one.
 4. **Whole page** captures everything by scrolling; untick it for just the
    visible part.
 5. Read the score, or open the full analysis in the web app.
+
+### Where captures go
+
+Everything lands in **your own account**, and captures are grouped into a
+project named after the site: capture `dribbble.com` three times and all three
+sit in one "dribbble.com" project. The popup names the project after each run,
+so you know where to find it.
+
+The signed-in account is shown in the popup header. That matters because the
+extension keeps its own session, separate from the web app's — if the two are
+signed in as different people, opening "full analysis" lands on a page telling
+you the analysis belongs to another account.
 
 ## What it does under the hood
 

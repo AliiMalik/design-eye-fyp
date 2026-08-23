@@ -33,6 +33,7 @@ async def upload_mockup(
     db: DbDep,
     file: UploadFile = File(...),
     project_id: str | None = Form(default=None),
+    project_title: str | None = Form(default=None),
     viewport_device: str | None = Form(default=None),
 ) -> UploadResponse:
     """Accept a mockup, store it, and queue analysis.
@@ -57,19 +58,31 @@ async def upload_mockup(
         )
     device = device or default_device(image.width, image.height)
 
-    # No project supplied: fall back to a per-user default project.
+    # No project supplied: group by title instead, creating it on first use.
+    #
+    # The Chrome extension sends the captured site's hostname, so every capture
+    # of one site collects in a project named after it rather than scattering
+    # through a single bucket. Find-or-create rather than always-create, which
+    # is what /upload/batch does -- a batch is one export and deserves its own
+    # project, whereas captures accumulate.
     if project_id:
         await get_owned_project(db, project_id, user["user_id"])
     else:
+        title = (project_title or "").strip()[:160] or "My Uploads"
         existing = await db[Collections.PROJECTS].find_one(
-            {"user_id": user["user_id"], "title": "My Uploads"}, {"_id": 0})
+            {"user_id": user["user_id"], "title": title}, {"_id": 0})
         if existing:
             project_id = existing["project_id"]
         else:
-            default = Project(user_id=user["user_id"], title="My Uploads",
-                              description="Mockups uploaded without a project")
-            await db[Collections.PROJECTS].insert_one(dict(default.to_mongo()))
-            project_id = default.project_id
+            created = Project(
+                user_id=user["user_id"],
+                title=title,
+                description=("Captured with the DesignEye Chrome extension"
+                             if project_title else
+                             "Mockups uploaded without a project"),
+            )
+            await db[Collections.PROJECTS].insert_one(dict(created.to_mongo()))
+            project_id = created.project_id
 
     asset = MockupAsset(
         project_id=project_id,

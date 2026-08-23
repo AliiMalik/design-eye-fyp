@@ -164,3 +164,77 @@ async def test_delete_removes_asset_and_result(client, user, clean_png):
 
     assert (await client.get(f"/results/{asset_id}",
                              headers=user["headers"])).status_code == 404
+
+
+# --- project grouping (the Chrome extension's path) ------------------------
+@pytest.mark.slow
+async def test_project_title_groups_captures_by_site(client, user, clean_png, db):
+    """The extension sends the captured site's hostname, so repeat captures of
+    one site collect in one project instead of scattering."""
+    from app.db.mongo import Collections
+
+    for _ in range(2):
+        resp = await client.post("/upload", headers=user["headers"],
+                                 files={"file": ("a.png", clean_png, "image/png")},
+                                 data={"project_title": "dribbble.com"})
+        assert resp.status_code == 202, resp.text
+
+    resp = await client.post("/upload", headers=user["headers"],
+                             files={"file": ("b.png", clean_png, "image/png")},
+                             data={"project_title": "figma.com"})
+    assert resp.status_code == 202
+
+    titles = await db[Collections.PROJECTS].distinct(
+        "title", {"user_id": user["user_id"]})
+    assert "dribbble.com" in titles and "figma.com" in titles
+
+    projects = await db[Collections.PROJECTS].find(
+        {"user_id": user["user_id"], "title": "dribbble.com"}).to_list(length=10)
+    assert len(projects) == 1, "a second capture must reuse the project, not add one"
+
+    assets = await db[Collections.MOCKUP_ASSETS].count_documents(
+        {"project_id": projects[0]["project_id"]})
+    assert assets == 2
+
+
+@pytest.mark.slow
+async def test_upload_without_a_title_still_uses_the_default_project(
+    client, user, clean_png, db,
+):
+    """The existing contract is untouched when no title is sent."""
+    from app.db.mongo import Collections
+
+    resp = await client.post("/upload", headers=user["headers"],
+                             files={"file": ("m.png", clean_png, "image/png")})
+    assert resp.status_code == 202
+    titles = await db[Collections.PROJECTS].distinct(
+        "title", {"user_id": user["user_id"]})
+    assert "My Uploads" in titles
+
+
+@pytest.mark.slow
+async def test_project_titles_are_per_user(client, user, other_user, clean_png, db):
+    """Two people capturing the same site must not share a project."""
+    from app.db.mongo import Collections
+
+    import uuid
+
+    # A unique title per run: the test database is not reset between runs, so a
+    # fixed one accumulated owners from earlier runs and the count drifted.
+    # Scoping to the two accounts under test is the real property anyway.
+    site = f"stripe-{uuid.uuid4().hex[:8]}.com"
+
+    for who in (user, other_user):
+        resp = await client.post("/upload", headers=who["headers"],
+                                 files={"file": ("s.png", clean_png, "image/png")},
+                                 data={"project_title": site})
+        assert resp.status_code == 202
+
+    mine = await db[Collections.PROJECTS].find(
+        {"title": site, "user_id": user["user_id"]}).to_list(length=10)
+    theirs = await db[Collections.PROJECTS].find(
+        {"title": site, "user_id": other_user["user_id"]}).to_list(length=10)
+
+    assert len(mine) == 1 and len(theirs) == 1, "each account gets exactly one"
+    assert mine[0]["project_id"] != theirs[0]["project_id"], (
+        "the project must not be shared across accounts")

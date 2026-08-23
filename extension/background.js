@@ -128,6 +128,13 @@ async function analyse({ fullPage }) {
   const name = (tab.title || "page").replace(/[^\w\- ]+/g, "").slice(0, 60) || "page";
   form.append("file", blob, `${name}.png`);
 
+  // Group captures by the site they came from. The server does find-or-create
+  // on the title, so every capture of one site lands in one project instead of
+  // scattering through a single bucket.
+  let site = "";
+  try { site = new URL(tab.url).hostname.replace(/^www\./, ""); } catch { /* keep blank */ }
+  if (site) form.append("project_title", site);
+
   const started = await apiFetch("/upload", { method: "POST", body: form });
 
   // Poll rather than hold the popup open: the popup may already be gone.
@@ -135,7 +142,7 @@ async function analyse({ fullPage }) {
     const status = await apiFetch(`/status/${started.task_id}`);
     if (status.status === "complete") {
       const result = await apiFetch(`/results/${started.asset_id}`);
-      return { result, slices, title: tab.title, url: tab.url };
+      return { result, slices, site, title: tab.title, url: tab.url };
     }
     if (status.status === "failed") throw new Error(status.error || "Analysis failed.");
     await sleep(1000);
@@ -148,6 +155,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg.type) {
       case "ANALYSE":
         return { ok: true, data: await analyse({ fullPage: msg.fullPage }) };
+      case "REGISTER": {
+        const { apiBase } = await getSettings();
+        const res = await fetch(`${apiBase}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: msg.email,
+            password: msg.password,
+            ...(msg.displayName ? { display_name: msg.displayName } : {}),
+          }),
+        });
+        if (!res.ok) {
+          // The server's own wording is better than anything invented here --
+          // it knows whether the address is taken or the password is too weak.
+          let detail = "Could not create that account.";
+          try {
+            const body = await res.json();
+            if (typeof body?.detail === "string") detail = body.detail;
+            else if (Array.isArray(body?.detail) && body.detail[0]?.msg) {
+              detail = body.detail[0].msg;
+            }
+          } catch { /* keep the fallback */ }
+          throw new Error(detail);
+        }
+        const body = await res.json();
+        await chrome.storage.local.set({ token: body.access_token, user: body.user });
+        return { ok: true, data: body.user };
+      }
       case "LOGIN": {
         const { apiBase } = await getSettings();
         const res = await fetch(`${apiBase}/auth/login`, {

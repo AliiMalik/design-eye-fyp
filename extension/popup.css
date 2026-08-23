@@ -1,11 +1,12 @@
 /* Matches the product's palette so the extension reads as part of DesignEye
    rather than a bolt-on: navy chrome, indigo primary, light-first. */
 :root {
+  color-scheme: light dark;
   --navy: #1b2559;
   --indigo: #4f5bd5;
   --ink: #1a1f36;
   --muted: #6b7288;
-  --faint: #a3abbd;
+  --faint: #68707f;
   --canvas: #ffffff;
   --surface: #f7f8fc;
   --hairline: rgba(15, 23, 42, 0.09);
@@ -54,9 +55,11 @@ label {
   font-weight: 500;
 }
 
-input[type="email"],
-input[type="password"],
-input[type="url"] {
+/* Every text-entry input, rather than a list of types. Enumerating them missed
+   type="text", so the name field fell back to the browser default and rendered
+   dark text on a dark background -- unreadable, and invisible until someone
+   typed into it. Excluding the toggles keeps accent-color working on those. */
+input:not([type="checkbox"]):not([type="radio"]) {
   width: 100%;
   height: 38px;
   padding: 0 11px;
@@ -108,6 +111,16 @@ button:focus-visible, a:focus-visible {
   border: 1px solid var(--hairline);
 }
 
+.who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.account {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
 .link {
   padding: 0;
   font-size: 12.5px;
@@ -138,6 +151,16 @@ button:focus-visible, a:focus-visible {
   background: #fff1f2;
   border-radius: 8px;
 }
+
+.swap {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.swap .link { font-weight: 600; color: var(--indigo); }
+
+#savedTo { text-align: center; }
 
 .settings { margin-top: 16px; }
 .settings summary {
@@ -204,7 +227,7 @@ button:focus-visible, a:focus-visible {
     --surface: #1a1d27;
     --ink: #eef1f8;
     --muted: #9aa2b8;
-    --faint: #6c7488;
+    --faint: #868ea3;
     --hairline: rgba(255, 255, 255, 0.1);
     --navy: #dfe3f2;
   }

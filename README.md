@@ -125,7 +125,7 @@ python scripts/verify_model.py
 cd backend && ../.venv/Scripts/python -m pytest
 ```
 
-169 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
+172 tests covering SDS test cases TC-01…TC-14, plus letterbox alignment, tenant
 isolation across every owned resource, token expiry, and the LLM adapter's
 retry-once behaviour. Mapping table in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §14.
 
@@ -243,6 +243,10 @@ See [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §21.
 site, click the toolbar icon, and the same model returns a Clarity Score and a
 heatmap. A whole-page capture scrolls the page and stitches the screenfuls into
 one tall image, which DesignEye then scores a screenful at a time.
+
+You can create an account from the popup itself, so someone handed the extension
+never has to open the web app first. Captures are filed into a project named
+after the site they came from, so repeat captures of one site collect together.
 
 Install it by loading `extension/` unpacked from `chrome://extensions` with
 Developer mode on. It needs a DesignEye server it can reach: it defaults to

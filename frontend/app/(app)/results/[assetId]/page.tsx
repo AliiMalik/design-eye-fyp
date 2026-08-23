@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Eyebrow, Reveal, Skeleton } from "@/components/ui/primitives";
 import { useDeleteResult, useResult, useRerun } from "@/hooks/use-api";
 import { API_URL, api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import { clarityBand, cn, formatRelative } from "@/lib/utils";
 
 /** "scanpath" is a sibling view, not a HeatmapViewer mode -- it owns its canvas. */
@@ -48,7 +50,8 @@ export default function ResultPage() {
   const assetId = params.assetId;
   const router = useRouter();
 
-  const { data: result, isLoading, isError, refetch } = useResult(assetId);
+  const { data: result, isLoading, isError, error, refetch } = useResult(assetId);
+  const user = useAuthStore((st) => st.user);
   const rerun = useRerun();
   const remove = useDeleteResult();
 
@@ -94,6 +97,13 @@ export default function ResultPage() {
   }
 
   if (isError || !result) {
+    // A 403 is not "not ready" -- the analysis exists and finished, it just
+    // belongs to somebody else. Saying "may still be processing" sent people to
+    // hit Retry forever. It happens for real: the Chrome extension keeps its own
+    // session, so uploading there as one account and opening the link while
+    // signed in as another lands exactly here.
+    const forbidden = axios.isAxiosError(error) && error.response?.status === 403;
+
     return (
       <div className="mx-auto max-w-[46rem]">
         <Bezel>
@@ -102,16 +112,29 @@ export default function ResultPage() {
               <AlertCircle size={22} strokeWidth={1.5} />
             </span>
             <h2 className="mt-5 font-display text-xl font-semibold">
-              This analysis isn&apos;t ready
+              {forbidden ? "This analysis belongs to another account" : "This analysis isn’t ready"}
             </h2>
             <p className="mt-2 max-w-md text-[14px] text-[var(--color-muted)]">
-              The result may still be processing, or it may have been removed.
+              {forbidden ? (
+                <>
+                  You’re signed in as{" "}
+                  <span className="font-medium text-[var(--color-ink)]">
+                    {user?.email ?? "another account"}
+                  </span>
+                  . Sign in with the account that ran it — if it came from the
+                  Chrome extension, check which account is signed in there.
+                </>
+              ) : (
+                "The result may still be processing, or it may have been removed."
+              )}
             </p>
             <div className="mt-7 flex gap-3">
-              <Button variant="outline" onClick={() => refetch()}>
-                <RefreshCw size={15} strokeWidth={1.5} />
-                Retry
-              </Button>
+              {forbidden ? null : (
+                <Button variant="outline" onClick={() => refetch()}>
+                  <RefreshCw size={15} strokeWidth={1.5} />
+                  Retry
+                </Button>
+              )}
               <Button asChild>
                 <Link href="/projects">Back to projects</Link>
               </Button>

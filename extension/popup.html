@@ -11,20 +11,32 @@
         <img src="icons/48.png" alt="" width="22" height="22" />
         <span>Design<em>Eye</em></span>
       </h1>
-      <button id="signout" class="link" hidden>Sign out</button>
+      <div class="who">
+        <span id="account" class="account" hidden></span>
+        <button id="signout" class="link" hidden>Sign out</button>
+      </div>
     </header>
 
     <!-- signed out -->
     <section id="auth" hidden>
-      <p class="lede">Sign in to analyse the page you are on.</p>
+      <p id="authLede" class="lede">Sign in to analyse the page you are on.</p>
       <form id="login">
+        <div id="nameRow" hidden>
+          <label for="displayName">Your name</label>
+          <input id="displayName" type="text" autocomplete="name" />
+        </div>
         <label for="email">Email</label>
         <input id="email" type="email" autocomplete="username" required />
         <label for="password">Password</label>
         <input id="password" type="password" autocomplete="current-password" required />
-        <button class="primary" type="submit">Sign in</button>
+        <p id="pwHint" class="hint" hidden>At least 8 characters.</p>
+        <button id="authSubmit" class="primary" type="submit">Sign in</button>
         <p id="authError" class="error" role="alert" hidden></p>
       </form>
+      <p class="swap">
+        <span id="swapText">New here?</span>
+        <button id="swapMode" class="link" type="button">Create an account</button>
+      </p>
       <details class="settings">
         <summary>Server address</summary>
         <label for="apiBase">DesignEye API</label>
@@ -66,6 +78,7 @@
       <p id="scoreBand" class="band">—</p>
       <p id="scoreNote" class="hint"></p>
       <img id="heatmap" class="shot" alt="Predicted attention heatmap for the captured page" />
+      <p id="savedTo" class="hint" hidden></p>
       <div class="row">
         <a id="openFull" class="primary" target="_blank" rel="noreferrer">Open full analysis</a>
         <button id="again" class="ghost">Analyse again</button>
