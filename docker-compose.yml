@@ -44,7 +44,7 @@ services:
       APP_ENV: production
       # Inference runs inline so the stack is usable even without the worker.
       DEV_MODE: "${DEV_MODE:-true}"
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,chrome-extension://illaijihjmgpodgbpbpiagnaplnjbdnf}
       MONGODB_URI: mongodb://mongo:27017
       MONGODB_DB: designeye
       REDIS_URL: redis://redis:6379/0

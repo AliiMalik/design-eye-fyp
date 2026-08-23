@@ -237,6 +237,24 @@ See [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md) §21.
 
 ---
 
+## Chrome extension
+
+`extension/` analyses **any live web page**, not just files you export — open a
+site, click the toolbar icon, and the same model returns a Clarity Score and a
+heatmap. A whole-page capture scrolls the page and stitches the screenfuls into
+one tall image, which DesignEye then scores a screenful at a time.
+
+Install it by loading `extension/` unpacked from `chrome://extensions` with
+Developer mode on. It needs a DesignEye server it can reach: it defaults to
+`http://localhost:8000`, and the address is editable in the popup, so sending it
+to someone else means deploying the API first.
+
+The extension id is pinned by the `key` in its manifest, so the API's CORS
+allow-list names that exact id rather than opening up to every extension.
+See [`extension/README.md`](extension/README.md).
+
+---
+
 ## Configuration
 
 `backend/.env` (see `backend/.env.example`). Notable values:

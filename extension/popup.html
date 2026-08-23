@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DesignEye</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1 class="brand">
+        <img src="icons/48.png" alt="" width="22" height="22" />
+        <span>Design<em>Eye</em></span>
+      </h1>
+      <button id="signout" class="link" hidden>Sign out</button>
+    </header>
+
+    <!-- signed out -->
+    <section id="auth" hidden>
+      <p class="lede">Sign in to analyse the page you are on.</p>
+      <form id="login">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+        <button class="primary" type="submit">Sign in</button>
+        <p id="authError" class="error" role="alert" hidden></p>
+      </form>
+      <details class="settings">
+        <summary>Server address</summary>
+        <label for="apiBase">DesignEye API</label>
+        <input id="apiBase" type="url" spellcheck="false" />
+        <button id="saveApi" class="ghost" type="button">Save</button>
+        <p class="hint">
+          Change this if DesignEye is running somewhere other than this computer.
+        </p>
+      </details>
+    </section>
+
+    <!-- signed in, ready -->
+    <section id="ready" hidden>
+      <p class="lede">Capture this page and see where attention lands.</p>
+      <label class="choice">
+        <input type="checkbox" id="fullPage" checked />
+        <span>
+          <strong>Whole page</strong>
+          <em>Scrolls and captures everything, not just the visible part.</em>
+        </span>
+      </label>
+      <button id="analyse" class="primary">Analyse this page</button>
+      <p id="readyError" class="error" role="alert" hidden></p>
+    </section>
+
+    <!-- working -->
+    <section id="working" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="workingText" class="lede">Capturing…</p>
+      <p class="hint">This usually takes a few seconds.</p>
+    </section>
+
+    <!-- result -->
+    <section id="result" hidden>
+      <div class="score">
+        <span id="scoreValue">—</span>
+        <small>/ 100</small>
+      </div>
+      <p id="scoreBand" class="band">—</p>
+      <p id="scoreNote" class="hint"></p>
+      <img id="heatmap" class="shot" alt="Predicted attention heatmap for the captured page" />
+      <div class="row">
+        <a id="openFull" class="primary" target="_blank" rel="noreferrer">Open full analysis</a>
+        <button id="again" class="ghost">Analyse again</button>
+      </div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

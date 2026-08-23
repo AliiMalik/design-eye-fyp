@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # --- cors ---
-    CORS_ORIGINS: str = "http://localhost:3000"
+    # The Chrome extension calls the same API from a chrome-extension:// origin.
+    # Its id is pinned by the "key" field in extension/manifest.json, so this
+    # stays an explicit allow-list entry rather than a wildcard.
+    CORS_ORIGINS: str = (
+        "http://localhost:3000,"
+        "chrome-extension://illaijihjmgpodgbpbpiagnaplnjbdnf"
+    )
 
     # --- database ---
     MONGODB_URI: str = "mongodb://localhost:27017"

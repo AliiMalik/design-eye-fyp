@@ -1,0 +1,212 @@
+/* Matches the product's palette so the extension reads as part of DesignEye
+   rather than a bolt-on: navy chrome, indigo primary, light-first. */
+:root {
+  --navy: #1b2559;
+  --indigo: #4f5bd5;
+  --ink: #1a1f36;
+  --muted: #6b7288;
+  --faint: #a3abbd;
+  --canvas: #ffffff;
+  --surface: #f7f8fc;
+  --hairline: rgba(15, 23, 42, 0.09);
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 340px;
+  margin: 0;
+  padding: 0 16px 16px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 13.5px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 14px;
+}
+
+.brand {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+}
+.brand em { font-style: normal; color: var(--indigo); }
+
+.lede { margin: 0 0 12px; color: var(--muted); }
+.hint { margin: 8px 0 0; font-size: 12px; color: var(--faint); }
+
+label {
+  display: block;
+  margin: 10px 0 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+input[type="email"],
+input[type="password"],
+input[type="url"] {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+}
+input:focus-visible {
+  outline: none;
+  background: var(--canvas);
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(79, 91, 213, 0.18);
+}
+
+button, .primary {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: transform 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+.primary {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 14px;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+  color: #fff;
+  background: var(--indigo);
+  border: 0;
+}
+.primary:hover { transform: translateY(-1px); }
+.primary:disabled { opacity: 0.55; cursor: default; transform: none; }
+
+.ghost {
+  padding: 11px 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+}
+
+.link {
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
+.link:hover { color: var(--indigo); }
+
+.choice {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 11px;
+  background: var(--surface);
+  border-radius: 10px;
+}
+.choice input { margin-top: 2px; accent-color: var(--indigo); }
+.choice strong { display: block; font-size: 13px; }
+.choice em { font-style: normal; font-size: 12px; color: var(--muted); }
+
+.error {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: #9f1239;
+  background: #fff1f2;
+  border-radius: 8px;
+}
+
+.settings { margin-top: 16px; }
+.settings summary {
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.settings .ghost { width: 100%; margin-top: 10px; }
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  margin: 10px auto 14px;
+  border: 2.5px solid rgba(79, 91, 213, 0.2);
+  border-top-color: var(--indigo);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+  .primary:hover { transform: none; }
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.score span { font-size: 38px; font-weight: 700; letter-spacing: -0.03em; }
+.score small { font-size: 12px; color: var(--faint); }
+
+.band {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+#scoreNote { text-align: center; }
+
+.shot {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  object-position: top;
+  margin-top: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+}
+
+.row { display: flex; gap: 8px; align-items: stretch; }
+.row .primary { flex: 1; margin-top: 14px; }
+.row .ghost { margin-top: 14px; white-space: nowrap; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #12141c;
+    --surface: #1a1d27;
+    --ink: #eef1f8;
+    --muted: #9aa2b8;
+    --faint: #6c7488;
+    --hairline: rgba(255, 255, 255, 0.1);
+    --navy: #dfe3f2;
+  }
+  .error { color: #fda4af; background: rgba(159, 18, 57, 0.18); }
+}
