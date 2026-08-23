@@ -150,6 +150,53 @@ async function analyse({ fullPage }) {
   throw new Error("Analysis is taking longer than expected.");
 }
 
+/**
+ * Messages from the DesignEye website itself.
+ *
+ * Chrome refuses to install an extension from anywhere but the Web Store, so a
+ * downloaded folder always has to be loaded by hand. What the site CAN do is
+ * take over from there: once the extension exists, the page hands it the server
+ * address and the session the user already has, so nobody signs in twice.
+ *
+ * Only origins listed under externally_connectable in the manifest can reach
+ * this, which is what makes accepting a token here safe.
+ */
+chrome.runtime.onMessageExternal.addListener((msg, _sender, sendResponse) => {
+  const run = async () => {
+    switch (msg?.type) {
+      case "PING": {
+        const { token, user } = await chrome.storage.local.get(["token", "user"]);
+        return {
+          ok: true,
+          installed: true,
+          version: chrome.runtime.getManifest().version,
+          signedIn: Boolean(token),
+          email: user?.email || null,
+        };
+      }
+      case "CONNECT": {
+        // The site is signed in already; adopting its session is what stops the
+        // extension and the web app drifting onto different accounts, which
+        // produced a baffling "belongs to another account" further downstream.
+        if (!msg.token) throw new Error("No session was supplied.");
+        await chrome.storage.local.set({
+          token: msg.token,
+          user: msg.user || null,
+          ...(msg.apiBase ? { apiBase: msg.apiBase } : {}),
+        });
+        return { ok: true, email: msg.user?.email || null };
+      }
+      default:
+        throw new Error("Unknown request.");
+    }
+  };
+
+  run()
+    .then(sendResponse)
+    .catch((err) => sendResponse({ ok: false, error: err.message || String(err) }));
+  return true;
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const run = async () => {
     switch (msg.type) {

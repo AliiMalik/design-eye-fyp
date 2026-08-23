@@ -248,8 +248,10 @@ You can create an account from the popup itself, so someone handed the extension
 never has to open the web app first. Captures are filed into a project named
 after the site they came from, so repeat captures of one site collect together.
 
-Install it by loading `extension/` unpacked from `chrome://extensions` with
-Developer mode on. It needs a DesignEye server it can reach: it defaults to
+Get it from **Chrome Extension** in the app's sidebar: download, unzip, and
+load unpacked. Chrome only auto-installs from its own Web Store, so that step is
+manual — but once it is in, the page connects it to your account for you, so you
+never sign in twice. See [`extension/README.md`](extension/README.md). It needs a DesignEye server it can reach: it defaults to
 `http://localhost:8000`, and the address is editable in the popup, so sending it
 to someone else means deploying the API first.
 

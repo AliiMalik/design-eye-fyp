@@ -11,23 +11,36 @@ a competitor's site, a staging build, a page you have not exported yet.
 
 ## Install it
 
-Chrome will not install a `.crx` from outside the Web Store, so the extension is
-distributed as a folder:
+**Chrome will not install this automatically, and no amount of code changes
+that.** Side-loading was removed in 2014 and inline install in 2018: an
+extension downloaded from a website cannot install itself, in developer mode or
+otherwise. The Web Store is the only one-click route.
 
-1. Zip the `extension/` folder and send it, or share this repo.
-2. The recipient opens `chrome://extensions`.
-3. Turns on **Developer mode** (top right).
-4. Clicks **Load unpacked** and picks the unzipped `extension/` folder.
+So the site does the next best thing. Sign in and open **Chrome Extension** in
+the sidebar:
 
-The extension id is pinned to
-`illaijihjmgpodgbpbpiagnaplnjbdnf` by the `key` field in `manifest.json`, so it
-is the same on every machine. That matters: the API's CORS allow-list names that
-exact id rather than opening up to all extensions.
+1. **Download** — one button, gives you `designeye-extension.zip`. Unzip it
+   somewhere permanent; Chrome loads the folder from where it sits.
+2. **`chrome://extensions`** — turn on **Developer mode**, top right.
+3. **Load unpacked** — pick the unzipped folder.
 
-> **It needs a DesignEye server it can reach.** Out of the box it points at
-> `http://localhost:8000`, which only works for someone running the stack
-> themselves. To send this to a person who is not running it, deploy the API and
-> have them set the address under **Server address** in the popup.
+Then return to the page and press **Check again**. It detects the extension and
+offers **Connect my account**, which hands over the session you already have in
+the browser — so there is no second sign-in, and captures cannot end up under a
+different account from the one you are browsing the app with.
+
+That handshake is possible because the extension lists the site under
+`externally_connectable` and its id is pinned by the `key` field in
+`manifest.json`. Only those origins can message it.
+
+Rebuild the archive after changing anything in this folder:
+
+```bash
+python scripts/build_extension.py
+```
+
+`extension/test/zip.test.mjs` fails if you forget, so the download cannot go
+stale silently.
 
 ## Use it
 

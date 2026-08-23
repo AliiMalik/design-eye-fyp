@@ -3,10 +3,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   GitCompareArrows,
+  Layers,
   LayoutGrid,
   LogOut,
-  Layers,
   Menu,
+  Puzzle,
   Settings,
   UploadCloud,
   X,
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/projects", label: "My Projects", icon: Layers },
   { href: "/upload", label: "Upload New", icon: UploadCloud },
   { href: "/compare", label: "A/B Compare", icon: GitCompareArrows },
+  { href: "/extension", label: "Chrome Extension", icon: Puzzle },
 ];
 
 const EASE = [0.32, 0.72, 0, 1] as const;
