@@ -39,6 +39,16 @@ Rebuild the archive after changing anything in this folder:
 python scripts/build_extension.py
 ```
 
+The icons here are generated, not hand-drawn. They come from the one source
+logo, recoloured onto the brand ramp and redrawn at each size, so edit
+`inputs/brand/logo-source.png` and re-run this instead of touching them:
+
+```bash
+python scripts/build_brand_assets.py
+```
+
+That rebuilds the archive for you as its last step.
+
 `extension/test/zip.test.mjs` fails if you forget, so the download cannot go
 stale silently.
 

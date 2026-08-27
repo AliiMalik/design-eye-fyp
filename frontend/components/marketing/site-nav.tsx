@@ -55,7 +55,7 @@ export function SiteNav() {
           )}
         >
           <Link href="/" className="flex items-center gap-2.5 pl-1">
-            <Logo size={32} />
+            <Logo size={26} />
             <Wordmark />
           </Link>
 

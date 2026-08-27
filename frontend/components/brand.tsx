@@ -1,46 +1,65 @@
 "use client";
 
+import Image, { type StaticImageData } from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
+import markCompactDark from "@/assets/brand/mark-compact-dark.png";
+import markCompactLight from "@/assets/brand/mark-compact-light.png";
+import markDark from "@/assets/brand/mark-dark.png";
+import markLight from "@/assets/brand/mark-light.png";
 import { cn } from "@/lib/utils";
 
-/** The DesignEye eye mark from the Visily screens. */
+const ART: Record<"full" | "compact", Record<"light" | "dark", StaticImageData>> = {
+  full: { light: markLight, dark: markDark },
+  compact: { light: markCompactLight, dark: markCompactDark },
+};
+
+/**
+ * The DesignEye mark: saliency contours closing on a bright pupil.
+ *
+ * `size` is the rendered height. The artwork is wider than it is tall, so the
+ * width follows from it rather than being passed in.
+ *
+ * There are two artworks because the mark has a dark pupil, which disappears on
+ * anything dark. `tone="light"` means "this chrome is dark whatever the theme"
+ * — the app sidebar is navy in both — so it pins the dark artwork instead of
+ * following next-themes. Everywhere else swaps in CSS, which keeps the choice
+ * out of hydration's way.
+ *
+ * `variant="compact"` drops the two outer rings: five strokes need about 3px
+ * each to stay separate, so the full mark only holds together above ~48px.
+ * Regenerate all of it with `python scripts/build_brand_assets.py`.
+ */
 export function Logo({
   className,
-  size = 36,
+  size = 26,
   tone = "brand",
+  variant = "compact",
 }: {
   className?: string;
   size?: number;
   tone?: "brand" | "light";
+  variant?: "full" | "compact";
 }) {
+  const art = ART[variant];
+  const box = { height: size, width: "auto" } as const;
+
+  // eager, not `priority`: which artwork is visible is decided in CSS, so
+  // `priority` preloads both and the browser reports the hidden one as an
+  // unused preload on every page. Plain lazy is worse -- the logo is above the
+  // fold, and it would hold the nav blank until the observer fires.
+  const load = { loading: "eager" } as const;
+
+  if (tone === "light") {
+    return <Image src={art.dark} alt="" {...load} style={box} className={cn("shrink-0", className)} />;
+  }
+
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-[0.7rem]",
-        tone === "brand"
-          ? "bg-navy-900 text-white"
-          : "bg-white/12 text-white ring-1 ring-white/20",
-        className,
-      )}
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      <svg
-        width={size * 0.55}
-        height={size * 0.55}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M1.5 12S5.2 5.5 12 5.5 22.5 12 22.5 12 18.8 18.5 12 18.5 1.5 12 1.5 12Z" />
-        <circle cx="12" cy="12" r="3.1" fill="currentColor" stroke="none" />
-      </svg>
+    <span className={cn("inline-flex shrink-0 items-center", className)}>
+      <Image src={art.light} alt="" {...load} style={box} className="dark:hidden" />
+      <Image src={art.dark} alt="" {...load} style={box} className="hidden dark:block" />
     </span>
   );
 }

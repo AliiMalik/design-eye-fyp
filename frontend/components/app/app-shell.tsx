@@ -56,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sidebar = (
     <div className="flex h-full flex-col bg-navy-900 px-4 py-6 text-white">
       <Link href="/dashboard" className="flex items-center gap-2.5 px-2">
-        <Logo size={34} tone="light" />
+        <Logo size={26} tone="light" />
         <Wordmark onDark />
       </Link>
 

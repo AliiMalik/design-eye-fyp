@@ -37,7 +37,7 @@ export function AuthShell({
           <div className="inner-lip rounded-[calc(2rem-0.375rem)] bg-[var(--color-surface)] px-7 py-10 ring-1 ring-[var(--color-hairline)] sm:px-9">
             <div className="flex flex-col items-center text-center">
               <Link href="/" aria-label="DesignEye home">
-                <Logo size={52} className="rounded-2xl" />
+                <Logo size={46} variant="full" />
               </Link>
               <h1 className="mt-5 font-display text-[1.7rem] font-bold tracking-tight">
                 {title}

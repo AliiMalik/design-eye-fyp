@@ -296,7 +296,7 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-[76rem] gap-12 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Link href="/" className="flex items-center gap-2.5">
-              <Logo size={32} />
+              <Logo size={26} />
               <Wordmark />
             </Link>
             <p className="mt-5 max-w-xs text-[13px] leading-relaxed text-[var(--color-muted)]">
