@@ -179,6 +179,23 @@ icons, macro whitespace (`py-24`+ on marketing sections), custom cubic-bezier
 `backdrop-blur` only on fixed/sticky elements. Lucide icons at
 `strokeWidth={1.5}`.
 
+**The brand mark is generated, never hand-edited.**
+`inputs/brand/logo-source.png` is the only source; `python
+scripts/build_brand_assets.py` produces every tier and both theme variants and
+rebuilds the extension archive as its last step. Editing a PNG under
+`frontend/assets/brand/`, `frontend/app/icon.png` or `extension/icons/` is
+undone by the next run.
+
+Three things that script encodes, so do not "simplify" them away:
+the supplied rings were **#FE0500 and #FE9200**, within a few points of
+`--color-danger` and `--color-warning`, and are recoloured onto the brand ramp
+with the order reversed so the bright ring lands on the pupil; the mark is
+**redrawn as it shrinks** (five rings above ~48px, three in app chrome, a filled
+lens at favicon and toolbar sizes, where the pupil-to-ring gap is under a pixel
+and no stroke weight survives); and there are **two artworks per tier** because
+the pupil is dark -- the app sidebar is navy in *both* themes, so `tone="light"`
+pins the dark artwork instead of following next-themes.
+
 ---
 
 ## Before calling anything done
