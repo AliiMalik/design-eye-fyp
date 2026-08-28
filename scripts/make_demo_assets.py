@@ -36,6 +36,38 @@ SOURCE = ROOT / "inputs" / "screens" / "visily-designeye-login.jpg"
 CROP_ASPECT = 1.34
 MAX_W = 1200
 
+# The hero is a screenshot, so the logo inside it is pixels, not a component --
+# left alone it keeps advertising whatever the brand used to be. The old navy
+# tile is painted out and the current mark dropped in its place, so the demo
+# tracks the brand automatically.
+MARK = ROOT / "frontend" / "assets" / "brand" / "mark-compact-light.png"
+OLD_MARK_BOX = (716, 183, 772, 240)   # the navy tile in the Visily export
+PAINT_BOX = (700, 167, 788, 256)      # the tile plus its drop shadow
+CARD_BG = (255, 255, 255)
+# The compact mark rather than the full one: the hero renders this screenshot
+# at roughly a third of its size, where five rings would be a smudge.
+MARK_HEIGHT = 54
+
+
+def rebrand(img: Image.Image) -> Image.Image:
+    if not MARK.is_file():
+        raise SystemExit(f"Missing {MARK}. Run scripts/build_brand_assets.py first.")
+
+    tile = np.asarray(img.crop(OLD_MARK_BOX).convert("RGB"), dtype=int)
+    if tile.sum(-1).mean() > 400:
+        raise SystemExit("OLD_MARK_BOX no longer covers the dark tile -- re-measure it.")
+
+    out = img.convert("RGB").copy()
+    out.paste(CARD_BG, PAINT_BOX)
+
+    mark = Image.open(MARK).convert("RGBA")
+    w = round(MARK_HEIGHT * mark.width / mark.height)
+    mark = mark.resize((w, MARK_HEIGHT), Image.LANCZOS)
+    cx = (OLD_MARK_BOX[0] + OLD_MARK_BOX[2]) // 2
+    cy = (OLD_MARK_BOX[1] + OLD_MARK_BOX[3]) // 2
+    out.paste(mark, (cx - w // 2, cy - MARK_HEIGHT // 2), mark)
+    return out
+
 
 def main() -> int:
     if not SOURCE.is_file():
@@ -45,7 +77,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     load_model(WEIGHTS)
 
-    full = Image.open(SOURCE).convert("RGB")
+    full = rebrand(Image.open(SOURCE))
     crop_h = min(full.height, int(full.width / CROP_ASPECT))
     img = full.crop((0, 0, full.width, crop_h))
 
