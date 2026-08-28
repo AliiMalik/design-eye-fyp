@@ -202,7 +202,7 @@ pins the dark artwork instead of following next-themes.
 
 ```bash
 python scripts/verify_model.py                    # 13 checks
-cd backend && ../.venv/Scripts/python -m pytest    # 172 tests
+cd backend && ../.venv/Scripts/python -m pytest    # 183 tests
 cd frontend && npx tsc --noEmit && npx next lint   # 0 errors, 0 warnings
 ```
 
