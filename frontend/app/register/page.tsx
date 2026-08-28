@@ -77,7 +77,10 @@ export default function RegisterPage() {
       });
       setSession(data.access_token, data.refresh_token, data.user);
       toast.success("Account created. Welcome to DesignEye.");
-      router.push("/dashboard");
+      // Straight to the one-time profile step rather than the dashboard: it is
+      // the only moment someone is willing to fill this in, and it can be
+      // skipped.
+      router.push("/welcome");
     } catch (error) {
       toast.error(apiErrorMessage(error, "Could not create your account."));
     } finally {

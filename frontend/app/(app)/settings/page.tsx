@@ -1,13 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cpu, Lock, Monitor, Moon, Palette, ShieldCheck, Sun, User } from "lucide-react";
+import { Lock, Monitor, Moon, Palette, ShieldCheck, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { AvatarPicker } from "@/components/app/avatar-picker";
 import { Bezel } from "@/components/ui/bezel";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +19,7 @@ import {
   Reveal,
   Textarea,
 } from "@/components/ui/primitives";
-import { useHealth, useMe } from "@/hooks/use-api";
+import { useApplyUser, useMe } from "@/hooks/use-api";
 import { api, apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn, formatDate } from "@/lib/utils";
@@ -55,8 +56,7 @@ const THEMES = [
 
 export default function SettingsPage() {
   const { data: me } = useMe();
-  const { data: health } = useHealth();
-  const setUser = useAuthStore((s) => s.setUser);
+  const applyUser = useApplyUser();
   const storedUser = useAuthStore((s) => s.user);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -78,7 +78,7 @@ export default function SettingsPage() {
   const saveProfile = profileForm.handleSubmit(async (values) => {
     try {
       const { data } = await api.patch<ApiUser>("/auth/me", values);
-      setUser(data);
+      applyUser(data);
       toast.success("Profile updated.");
     } catch (error) {
       toast.error(apiErrorMessage(error, "Could not update your profile."));
@@ -97,8 +97,6 @@ export default function SettingsPage() {
       toast.error(apiErrorMessage(error, "Could not update your password."));
     }
   });
-
-  const initial = (user?.display_name ?? user?.email ?? "D").slice(0, 1).toUpperCase();
 
   return (
     <div className="mx-auto max-w-[52rem] space-y-7">
@@ -124,11 +122,8 @@ export default function SettingsPage() {
               This is how you appear across your workspace.
             </p>
 
-            <div className="mt-6 flex items-center gap-4 rounded-2xl bg-[var(--color-surface-2)] p-5 ring-1 ring-[var(--color-hairline)]">
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 font-display text-2xl font-bold text-white">
-                {initial}
-              </span>
-              <div className="min-w-0">
+            <div className="mt-6 flex items-start gap-4 rounded-2xl bg-[var(--color-surface-2)] p-5 ring-1 ring-[var(--color-hairline)]">
+              <AvatarPicker user={user ?? null}>
                 <p className="truncate text-[15px] font-semibold">
                   {user?.display_name ?? "Designer"}
                 </p>
@@ -140,8 +135,8 @@ export default function SettingsPage() {
                     Member since {formatDate(user.created_at)}
                   </p>
                 ) : null}
-              </div>
-              <Badge tone="indigo" className="ml-auto shrink-0">
+              </AvatarPicker>
+              <Badge tone="indigo" className="shrink-0">
                 {user?.role ?? "designer"}
               </Badge>
             </div>
@@ -295,42 +290,6 @@ export default function SettingsPage() {
                 );
               })}
             </div>
-          </div>
-        </Bezel>
-      </Reveal>
-
-      {/* --- system --- */}
-      <Reveal>
-        <Bezel>
-          <div className="p-7 sm:p-8">
-            <h2 className="flex items-center gap-2 font-display text-[17px] font-semibold">
-              <Cpu size={17} strokeWidth={1.5} className="text-indigo-600" />
-              System
-            </h2>
-            <p className="mt-1.5 text-[13px] text-[var(--color-muted)]">
-              Live status of the inference backend.
-            </p>
-
-            <dl className="mt-6 space-y-3">
-              {[
-                { k: "API status", v: health?.status ?? "unknown" },
-                { k: "Model loaded", v: health?.model_loaded ? "yes" : "no" },
-                { k: "Database", v: health?.db ? "connected" : "unavailable" },
-                { k: "Job queue", v: health?.redis ? "connected" : "not required" },
-                { k: "Model version", v: String(health?.model_info?.model_version ?? "—") },
-                { k: "Model build", v: String(health?.model_info?.checkpoint_version ?? "—") },
-                { k: "Device", v: String(health?.model_info?.device ?? "—") },
-                { k: "API version", v: health?.version ?? "—" },
-              ].map((row) => (
-                <div
-                  key={row.k}
-                  className="flex items-baseline justify-between gap-3 border-b border-[var(--color-hairline)] pb-2.5 last:border-0"
-                >
-                  <dt className="text-[13px] text-[var(--color-muted)]">{row.k}</dt>
-                  <dd className="tabular truncate text-[13px] font-semibold">{row.v}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
         </Bezel>
       </Reveal>

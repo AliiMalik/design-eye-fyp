@@ -81,6 +81,9 @@ class User(MongoModel):
     updated_at: datetime = Field(default_factory=utcnow)
     is_active: bool = True
     bio: str | None = None
+    # The storage key, not a URL: the URL is derived at response time so a
+    # change of storage backend or CDN host does not strand every avatar.
+    avatar_key: str | None = None
 
 
 class Project(MongoModel):

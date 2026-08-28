@@ -6,6 +6,7 @@ export interface User {
   display_name: string | null;
   role: string;
   bio: string | null;
+  avatar_url: string | null;
   is_active: boolean;
   created_at: string;
 }

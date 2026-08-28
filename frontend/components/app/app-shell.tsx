@@ -17,6 +17,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { UserAvatar } from "@/components/app/user-avatar";
 import { Logo, ThemeToggle, Wordmark } from "@/components/brand";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -176,9 +177,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {user?.role ?? "designer"}
               </p>
             </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[13px] font-bold text-white">
-              {(user?.display_name ?? user?.email ?? "D").slice(0, 1).toUpperCase()}
-            </span>
+            <UserAvatar user={user} size={36} />
           </div>
         </header>
 

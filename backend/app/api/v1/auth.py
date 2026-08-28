@@ -12,7 +12,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, File, Request, UploadFile, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -43,6 +43,9 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.schemas.common import MessageResponse
+from app.services.avatars import avatar_key, build_avatar
+from app.services.images import UnsupportedFileError
+from app.services.storage import StorageService, get_storage
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -52,12 +55,28 @@ RESET_TOKEN_TTL_MINUTES = 30
 
 
 def _user_response(doc: dict) -> UserResponse:
+    key = doc.get("avatar_key")
     return UserResponse(
         user_id=doc["user_id"], email=doc["email"],
         display_name=doc.get("display_name"), role=doc.get("role", "designer"),
         bio=doc.get("bio"), is_active=doc.get("is_active", True),
+        avatar_url=get_storage().url_for(key) if key else None,
         created_at=doc["created_at"],
     )
+
+
+def _discard(storage: StorageService, key: str | None, keep: str) -> None:
+    """Drop a replaced avatar. Best effort -- an orphaned object is untidy, but
+    failing someone's upload because the old one would not delete is worse.
+
+    ``keep`` guards the re-upload of an identical picture: the key is the
+    content hash, so the "previous" object is the one just written."""
+    if not key or key == keep:
+        return
+    try:
+        storage.delete(key)
+    except Exception:  # noqa: BLE001 - never fail the request over cleanup
+        logger.warning("Could not remove the previous avatar %s", key)
 
 
 async def _issue_tokens(db, user: dict) -> TokenResponse:
@@ -220,6 +239,40 @@ async def update_me(payload: UpdateProfileRequest, user: CurrentUser,
         updates["updated_at"] = utcnow()
         await db[Collections.USERS].update_one({"user_id": user["user_id"]},
                                                {"$set": updates})
+    fresh = await db[Collections.USERS].find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return _user_response(fresh)
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(user: CurrentUser, db: DbDep,
+                        file: UploadFile = File(...)) -> UserResponse:
+    """Replace the signed-in user's profile picture."""
+    try:
+        data = build_avatar(await file.read())
+    except UnsupportedFileError as exc:
+        raise bad_request(str(exc)) from exc
+
+    storage = get_storage()
+    key = avatar_key(user["user_id"], data)
+    storage.save_bytes(key, data, "image/png")
+    await db[Collections.USERS].update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"avatar_key": key, "updated_at": utcnow()}},
+    )
+    _discard(storage, user.get("avatar_key"), key)
+
+    fresh = await db[Collections.USERS].find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return _user_response(fresh)
+
+
+@router.delete("/me/avatar", response_model=UserResponse)
+async def remove_avatar(user: CurrentUser, db: DbDep) -> UserResponse:
+    await db[Collections.USERS].update_one(
+        {"user_id": user["user_id"]},
+        {"$unset": {"avatar_key": ""}, "$set": {"updated_at": utcnow()}},
+    )
+    _discard(get_storage(), user.get("avatar_key"), "")
+
     fresh = await db[Collections.USERS].find_one({"user_id": user["user_id"]}, {"_id": 0})
     return _user_response(fresh)
 

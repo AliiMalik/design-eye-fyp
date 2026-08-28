@@ -74,6 +74,7 @@ class UserResponse(BaseModel):
     display_name: str | None = None
     role: str = "designer"
     bio: str | None = None
+    avatar_url: str | None = None
     is_active: bool = True
     created_at: datetime
 

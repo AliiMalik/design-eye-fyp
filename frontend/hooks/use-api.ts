@@ -6,9 +6,10 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import type {
   AnalysisResult,
   Batch,
@@ -60,6 +61,25 @@ export function useMe(enabled = true) {
     enabled,
     retry: false,
   });
+}
+
+/**
+ * Land a freshly saved user in both places that hold one.
+ *
+ * The auth store drives the header while useMe() drives the settings page, and
+ * that page prefers the query. Writing only the store leaves it rendering the
+ * profile as it was before the edit -- a removed picture stays on screen.
+ */
+export function useApplyUser(): (user: User) => void {
+  const qc = useQueryClient();
+  const setUser = useAuthStore((s) => s.setUser);
+  return useCallback(
+    (user: User) => {
+      setUser(user);
+      qc.setQueryData(qk.me, user);
+    },
+    [qc, setUser],
+  );
 }
 
 export function useDashboard() {
