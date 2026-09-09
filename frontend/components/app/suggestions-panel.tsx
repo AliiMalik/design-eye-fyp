@@ -55,18 +55,12 @@ export function SuggestionsPanel({ assetId }: { assetId: string }) {
               AI design suggestions
             </h2>
             <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-[var(--color-muted)]">
-              Generated from the numeric analytics only — the model never sees your
+              Generated from the numeric analytics only. The model never sees your
               image, so every suggestion cites the metric that motivated it.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5">
-            {data?.provider ? (
-              <Badge tone="violet">
-                {data.provider}
-                {data.model_name ? ` · ${data.model_name}` : ""}
-              </Badge>
-            ) : null}
             <Button
               size="sm"
               variant={hasItems ? "outline" : "primary"}

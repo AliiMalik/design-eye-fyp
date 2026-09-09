@@ -125,7 +125,7 @@ export default function ExtensionPage() {
         </h1>
         <p className="mt-2 max-w-[38rem] text-[14.5px] leading-relaxed text-[var(--color-muted)]">
           The web app analyses files you export. The extension analyses whatever
-          is on screen — a competitor&rsquo;s site, a staging build, a page you
+          is on screen: a competitor&rsquo;s site, a staging build, a page you
           haven&rsquo;t exported yet.
         </p>
       </Reveal>
@@ -155,7 +155,7 @@ export default function ExtensionPage() {
                   {probe.state === "checking"
                     ? "Looking for the extension…"
                     : installed
-                      ? `Installed — version ${probe.version}`
+                      ? `Installed, version ${probe.version}`
                       : "Not installed yet"}
                 </p>
                 <p className="mt-0.5 text-[12.5px] text-[var(--color-muted)]">
@@ -210,8 +210,8 @@ export default function ExtensionPage() {
                   body: (
                     <>
                       Save <code className="rounded bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[12px]">designeye-extension.zip</code>{" "}
-                      and unzip it somewhere you won&rsquo;t delete — Chrome loads
-                      the folder from where it sits.
+                      and unzip it somewhere you won&rsquo;t delete. Chrome loads the
+                      folder from where it sits.
                     </>
                   ),
                 },
@@ -278,7 +278,7 @@ export default function ExtensionPage() {
             </div>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--color-muted)]">
               Connecting hands the extension the session you already have here,
-              so it works as <strong>you</strong> straight away — and your captures
+              so it works as <strong>you</strong> straight away, and your captures
               open correctly from this app instead of belonging to a different
               account.
             </p>

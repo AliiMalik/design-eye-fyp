@@ -353,8 +353,8 @@ export function ScanpathPlayer({
           not a recording. DesignEye predicts <em>where</em> people are most likely to
           look, then plays those spots back strongest-first, using pause lengths taken
           from published eye-tracking research. Real viewers won&apos;t follow this exact
-          route — treat it as a guide to what stands out, not a prediction of the order
-          someone will look in.
+          route, so treat it as a guide to what stands out rather than a prediction of
+          the order someone will look in.
         </p>
       </div>
 

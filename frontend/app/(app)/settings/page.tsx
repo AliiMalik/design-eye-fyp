@@ -197,7 +197,7 @@ export default function SettingsPage() {
               Security &amp; access
             </h2>
             <p className="mt-1.5 text-[13px] text-[var(--color-muted)]">
-              Your password is stored scrambled, so nobody — including us — can read it.
+              Your password is stored scrambled, so nobody, including us, can read it.
             </p>
 
             <Field

@@ -121,8 +121,8 @@ export default function ResultPage() {
                   <span className="font-medium text-[var(--color-ink)]">
                     {user?.email ?? "another account"}
                   </span>
-                  . Sign in with the account that ran it — if it came from the
-                  Chrome extension, check which account is signed in there.
+                  . Sign in with the account that ran it. If it came from the Chrome
+                  extension, check which account is signed in there.
                 </>
               ) : (
                 "The result may still be processing, or it may have been removed."
@@ -372,8 +372,8 @@ export default function ResultPage() {
                     <p className="text-[12.5px] leading-relaxed text-[var(--color-muted)]">
                       This is a dark design. Our attention model reads light
                       screens more reliably, so it was shown a brightened copy of
-                      your upload. Your design is unchanged — only the score was
-                      worked out this way.
+                      your upload. Your design is unchanged; only the score was worked
+                      out this way.
                     </p>
                   </div>
                 ) : null}
@@ -392,7 +392,6 @@ export default function ResultPage() {
                   {[
                     { k: "Focus index", v: result.focus_index.toFixed(3), hint: "concentration" },
                     { k: "Clutter index", v: result.clutter_index.toFixed(3), hint: "edge density" },
-                    { k: "Model", v: result.model_version, hint: "" },
                   ].map((row) => (
                     <div key={row.k} className="flex items-baseline justify-between gap-3">
                       <dt className="text-[12.5px] text-[var(--color-muted)]">

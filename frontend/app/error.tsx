@@ -34,7 +34,7 @@ export default function GlobalError({
           This page didn&rsquo;t load
         </h1>
         <p className="mt-3 text-[14px] leading-relaxed text-[var(--color-muted)]">
-          Your work is safe — nothing was lost. Try again, and if it keeps
+          Your work is safe and nothing was lost. Try again, and if it keeps
           happening, head back to your dashboard.
         </p>
 

@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   BarChart3,
   Check,
-  CircuitBoard,
   Eye,
   Gauge,
   Layers,
@@ -326,14 +325,10 @@ export default function LandingPage() {
               Project
             </h4>
             <p className="mt-5 text-[13px] leading-relaxed text-[var(--color-muted)]">
-              Final Year Project &mdash; Group S26CS003
+              Final Year Project, Group S26CS003
               <br />
               University of Central Punjab
             </p>
-            <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--color-shell)] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              <CircuitBoard size={12} strokeWidth={1.5} />
-              stage3-ui-v1
-            </span>
           </div>
         </div>
 

@@ -217,7 +217,6 @@ def build_result_report(asset: dict[str, Any], result: dict[str, Any],
         ("Clarity Score (0-100)", f"{result.get('clarity_score', 0):.1f}"),
         ("Focus index (attention concentration)", f"{result.get('focus_index', 0):.3f}"),
         ("Clutter index (edge density)", f"{result.get('clutter_index', 0):.3f}"),
-        ("Model version", str(result.get("model_version", ""))),
         ("Inference time", f"{result.get('inference_time_ms', 0)} ms"),
         ("Mockup dimensions", f"{asset.get('width', 0)} x {asset.get('height', 0)} px"),
     ]))

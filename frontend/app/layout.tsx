@@ -24,7 +24,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "DesignEye — Predictive UX Heatmaps",
+    default: "DesignEye · Predictive UX Heatmaps",
     template: "%s · DesignEye",
   },
   description:

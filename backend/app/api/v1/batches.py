@@ -44,6 +44,7 @@ from app.services.images import (
     sniff_format,
     validate_size,
 )
+from app.services.cleanup import purge_assets
 from app.services.jobs import enqueue_analysis
 from app.services.llm import generate_flow_suggestions
 from app.services.pdf import build_flow_report
@@ -298,32 +299,9 @@ async def delete_batch(batch_id: str, user: CurrentUser, db: DbDep) -> MessageRe
     """Delete a batch and every screen derived from it."""
     await get_owned_batch(db, batch_id, user["user_id"])
 
-    assets = await db[Collections.MOCKUP_ASSETS].find(
-        {"batch_id": batch_id}, {"_id": 0, "asset_id": 1, "storage_key": 1}
-    ).to_list(length=MAX_PDF_PAGES)
-    asset_ids = [a["asset_id"] for a in assets]
-
-    storage = get_storage()
-    results = await db[Collections.HEATMAP_RESULTS].find(
-        {"asset_id": {"$in": asset_ids}}, {"_id": 0}).to_list(length=MAX_PDF_PAGES)
-
-    for key in [a.get("storage_key") for a in assets]:
-        if key:
-            try:
-                storage.delete(key)
-            except Exception as exc:  # noqa: BLE001 - DB cleanup still proceeds
-                logger.warning("Could not delete %s: %s", key, exc)
-    for result in results:
-        for key in (result.get("storage_keys") or {}).values():
-            try:
-                storage.delete(key)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Could not delete %s: %s", key, exc)
-        await db[Collections.SUGGESTIONS].delete_many({"result_id": result["result_id"]})
-
-    await db[Collections.HEATMAP_RESULTS].delete_many({"asset_id": {"$in": asset_ids}})
-    await db[Collections.INFERENCE_TASKS].delete_many({"asset_id": {"$in": asset_ids}})
-    await db[Collections.MOCKUP_ASSETS].delete_many({"batch_id": batch_id})
+    asset_ids = await db[Collections.MOCKUP_ASSETS].distinct(
+        "asset_id", {"batch_id": batch_id})
+    await purge_assets(db, asset_ids)
     await db[Collections.BATCHES].delete_one({"batch_id": batch_id})
 
     return MessageResponse(message="Batch deleted")

@@ -202,9 +202,10 @@ class MockProvider:
                 {
                     "title": "Lift the areas nobody is looking at",
                     "detail": "Several parts of the layout draw almost no attention. "
-                              "If anything important sits there -- a price, a sign-up "
-                              "button, a piece of reassurance -- give it more visual "
-                              "weight or move it somewhere the eye already goes.",
+                              "If anything important sits there, such as a price, a "
+                              "sign-up button or a piece of reassurance, give it "
+                              "more visual weight or move it somewhere the eye "
+                              "already goes.",
                     "severity": "medium",
                     "based_on": "region_saliency",
                 },

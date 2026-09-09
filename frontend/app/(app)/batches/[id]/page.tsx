@@ -138,8 +138,8 @@ export default function BatchPage() {
             {batch.pages_skipped > 0 ? (
               <p className="mt-1.5 text-[12.5px] text-amber-700 dark:text-amber-400">
                 The last {batch.pages_skipped}{" "}
-                {batch.pages_skipped === 1 ? "screen was" : "screens were"} left out —
-                we analyse the first {batch.page_count} in one go.
+                {batch.pages_skipped === 1 ? "screen was" : "screens were"} left out.
+                We analyse the first {batch.page_count} in one go.
               </p>
             ) : null}
           </div>
@@ -339,18 +339,12 @@ export default function BatchPage() {
                 <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-[var(--color-muted)]">
                   All {batch.page_count} screens are reviewed together in a{" "}
                   <span className="font-medium text-[var(--color-ink)]">single request</span>,
-                  so it costs one use of your daily limit instead of {batch.page_count} —
-                  and because the reviewer sees every screen at once, it can tell you
-                  where the flow gets worse, not just what each screen looks like.
+                  so it costs one use of your daily limit instead of {batch.page_count}.
+                  Because the reviewer sees every screen at once, it can also tell
+                  you where the flow gets worse, not just what each screen looks like.
                 </p>
               </div>
               <div className="flex items-center gap-2.5">
-                {batch.llm_provider ? (
-                  <Badge tone="violet">
-                    {batch.llm_provider}
-                    {batch.llm_model ? ` · ${batch.llm_model}` : ""}
-                  </Badge>
-                ) : null}
                 <Button
                   size="sm"
                   variant={reviewed ? "outline" : "primary"}
