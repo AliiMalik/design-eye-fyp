@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import time
 import uuid
 
@@ -9,6 +11,7 @@ import jwt
 import pytest
 
 from app.config import settings
+from app.db.mongo import Collections
 
 
 async def test_tc01_register_valid_credentials(client):
@@ -165,8 +168,9 @@ async def test_me_and_profile_update(client, user):
 async def test_password_reset_flow(client, user):
     started = await client.post("/auth/reset-password", json={"email": user["email"]})
     assert started.status_code == 200
-    # DEV_MODE returns the token inline because there is no mail service.
-    token = started.json()["message"].split("DEV_MODE token:")[-1].strip()
+    # EXPOSE_RESET_TOKEN hands the token back as a typed field, so the flow is
+    # walkable with no mail service. Normally it only ever appears in the email.
+    token = started.json()["reset_token"]
     assert token
 
     confirmed = await client.post("/auth/reset-password/confirm",
@@ -181,11 +185,55 @@ async def test_password_reset_flow(client, user):
                                     "password": user["password"]})).status_code == 401
 
 
+async def test_reset_token_is_never_stored_in_the_clear(client, user, db):
+    """Only the digest is persisted, so a leaked dump hands over nothing."""
+    started = await client.post("/auth/reset-password", json={"email": user["email"]})
+    token = started.json()["reset_token"]
+
+    doc = await db[Collections.USERS].find_one({"user_id": user["user_id"]}, {"_id": 0})
+    assert doc.get("reset_token") is None, "plaintext token was persisted"
+    assert doc["reset_token_hash"] == hashlib.sha256(token.encode()).hexdigest()
+    assert token not in str(doc)
+
+
+async def test_reset_is_single_use(client, user):
+    token = (await client.post("/auth/reset-password",
+                               json={"email": user["email"]})).json()["reset_token"]
+    first = await client.post("/auth/reset-password/confirm",
+                              json={"token": token, "new_password": "Once@12345"})
+    assert first.status_code == 200
+
+    replayed = await client.post("/auth/reset-password/confirm",
+                                 json={"token": token, "new_password": "Twice@12345"})
+    assert replayed.status_code == 400
+
+
+async def test_reset_revokes_sessions_issued_beforehand(client, user):
+    """A reset must end the attacker's session, not just change the password.
+
+    Without a revocation stamp a stolen refresh token outlives the very reset
+    meant to shut it out, for up to REFRESH_TOKEN_EXPIRE_DAYS.
+    """
+    assert (await client.get("/auth/me", headers=user["headers"])).status_code == 200
+
+    token = (await client.post("/auth/reset-password",
+                               json={"email": user["email"]})).json()["reset_token"]
+    await asyncio.sleep(1.1)  # iat has whole-second resolution
+    assert (await client.post(
+        "/auth/reset-password/confirm",
+        json={"token": token, "new_password": "Revoked@1234"})).status_code == 200
+
+    assert (await client.get("/auth/me", headers=user["headers"])).status_code == 401
+    assert (await client.post(
+        "/auth/refresh",
+        json={"refresh_token": user["refresh_token"]})).status_code == 401
+
+
 async def test_reset_for_unknown_email_does_not_leak(client):
     resp = await client.post("/auth/reset-password",
                              json={"email": "ghost@designeye.dev"})
     assert resp.status_code == 200
-    assert "DEV_MODE token" not in resp.json()["message"]
+    assert resp.json()["reset_token"] is None
 
 
 async def test_auth_endpoints_are_rate_limited(client):

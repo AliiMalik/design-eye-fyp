@@ -185,10 +185,44 @@ ultra-light lines the skill requires.
 ## 9. Password reset has no mail service
 
 **SDS:** Firebase emails a reset link (US-03).
-**Built:** a 30-minute single-use token stored on the user document. There is no
-SMTP integration, so the token is logged server-side and, in `DEV_MODE` only,
-returned in the response so the flow is demonstrable end to end. The endpoint
-returns an identical message for unknown emails, so it cannot enumerate accounts.
+**Built:** a 30-minute single-use token, stored as a digest on the user
+document. Delivery is deliberately **out of scope** — there is no SMTP or
+transactional-email integration, so the token is not sent anywhere. With
+`EXPOSE_RESET_TOKEN=true` it is returned in the API response, which is how the
+flow is walked end to end and how the tests drive it; with the flag off (the
+default) a reset can be requested but not completed without database access.
+
+Wiring a real mail provider is the one remaining piece before this flow is
+usable by anyone other than the operator, and it is a prerequisite for
+deployment rather than for the demo.
+
+Four properties the reset flow does have:
+
+- **Only the SHA-256 digest is stored** (`users.reset_token_hash`, sparse index).
+  The token is a bearer credential for the account; held in the clear, anyone who
+  could read the collection — a backup, a log shipper — could take over every
+  account with a reset in flight. Plain SHA-256 is sufficient where bcrypt is not,
+  because the token is 32 random bytes from `secrets` and there is no dictionary
+  to run against it.
+- **The token is never logged.** Only the user id is. An earlier build logged
+  the token itself at INFO, which put every in-flight reset in the server log.
+- **A reset revokes every session issued beforehand.** `users.tokens_valid_from`
+  is stamped on reset and on change-password, and both `get_current_user` and
+  `/auth/refresh` reject tokens whose `iat` predates it. Without this a stolen
+  refresh token outlived the very reset meant to shut it out, for up to
+  `REFRESH_TOKEN_EXPIRE_DAYS`. The stamp is truncated to whole seconds because a
+  JWT `iat` is whole seconds; at microsecond precision a token minted in the same
+  second as the reset would be rejected immediately.
+- **`EXPOSE_RESET_TOKEN` replaces the `DEV_MODE` gate.** `DEV_MODE` means "run
+  inference inline rather than through Celery" — an unrelated concern, and one
+  that is entirely reasonable to switch on somewhere that handing a reset token
+  to any anonymous caller who knows an email address would not be. Two concerns,
+  two flags; this one defaults to **false**. When it is on, the token comes back
+  as a typed `reset_token` field rather than spliced into the message string, so
+  the UI reads a value instead of parsing a sentence.
+
+The endpoint still returns an identical reply for unknown emails, so it cannot
+enumerate accounts.
 
 ---
 

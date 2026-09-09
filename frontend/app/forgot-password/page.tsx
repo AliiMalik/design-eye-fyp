@@ -11,13 +11,16 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/primitives";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { MessageResponse } from "@/types/api";
+import type { ResetRequestResponse } from "@/types/api";
 
 const schema = z.object({ email: z.string().email("Enter a valid email address.") });
 type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordPage() {
   const [sent, setSent] = useState<string | null>(null);
+  // Only ever set when the API runs with EXPOSE_RESET_TOKEN; otherwise the link
+  // arrives by email and never reaches the browser.
+  const [devToken, setDevToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,8 +34,12 @@ export default function ForgotPasswordPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { data } = await api.post<MessageResponse>("/auth/reset-password", values);
+      const { data } = await api.post<ResetRequestResponse>(
+        "/auth/reset-password",
+        values,
+      );
       setSent(data.message);
+      setDevToken(data.reset_token ?? null);
     } catch (err) {
       setError(apiErrorMessage(err, "Could not send the reset link."));
     } finally {
@@ -55,24 +62,21 @@ export default function ForgotPasswordPage() {
             />
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium text-emerald-800 dark:text-emerald-300">
-                Reset link sent to your email.
+                {sent}
               </p>
-              {/* In DEV_MODE the API returns the token inline; there is no mail service. */}
-              {sent.includes("DEV_MODE token:") ? (
+              {/* Present only when the server is configured to hand the token
+                  back instead of emailing it. */}
+              {devToken ? (
                 <p className="mt-2 break-all font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {sent.replace("Reset link sent. ", "")}
+                  {devToken}
                 </p>
               ) : null}
             </div>
           </div>
 
-          {sent.includes("DEV_MODE token:") ? (
+          {devToken ? (
             <Button asChild variant="outline" size="lg" className="w-full">
-              <Link
-                href={`/reset-password?token=${encodeURIComponent(
-                  sent.split("DEV_MODE token:")[1]?.trim() ?? "",
-                )}`}
-              >
+              <Link href={`/reset-password?token=${encodeURIComponent(devToken)}`}>
                 Continue to reset form
               </Link>
             </Button>

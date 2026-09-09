@@ -8,6 +8,7 @@ annotations the request models silently degrade to query parameters and every
 rate-limited endpoint 422s. Keep the annotations evaluated eagerly.
 """
 
+import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,7 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     hash_password,
+    token_predates_revocation,
     verify_password,
 )
 from app.db.mongo import Collections
@@ -38,6 +40,7 @@ from app.schemas.auth import (
     RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,
+    ResetRequestResponse,
     TokenResponse,
     UpdateProfileRequest,
     UserResponse,
@@ -52,6 +55,28 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 RESET_TOKEN_TTL_MINUTES = 30
+
+
+def hash_reset_token(token: str) -> str:
+    """Digest a reset token for storage.
+
+    The token is a bearer credential for the whole account. Held in the clear,
+    anyone who can read the users collection -- a backup, a log shipper, a
+    read-only analytics account -- can take over every account with a reset in
+    flight. A plain SHA-256 is enough here (unlike a password): the token is 32
+    random bytes from `secrets`, so there is no dictionary to run against it.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _revocation_stamp() -> datetime:
+    """The cut-off written to ``users.tokens_valid_from``.
+
+    Truncated to whole seconds because a JWT's ``iat`` is whole seconds. Left at
+    microsecond precision, a token minted in the same second as the reset would
+    compare as older than the cut-off and be rejected immediately.
+    """
+    return utcnow().replace(microsecond=0)
 
 
 def _user_response(doc: dict) -> UserResponse:
@@ -149,6 +174,8 @@ async def refresh_token(payload: RefreshRequest, db: DbDep) -> AccessTokenRespon
     user = await db[Collections.USERS].find_one({"user_id": claims["sub"]}, {"_id": 0})
     if user is None or not user.get("is_active", True):
         raise unauthorized("Account is unavailable.")
+    if token_predates_revocation(user, claims):
+        raise unauthorized("This session has been revoked. Please log in again.")
 
     return AccessTokenResponse(
         access_token=create_access_token(user["user_id"], user["email"]),
@@ -176,40 +203,50 @@ async def logout(payload: LogoutRequest, user: CurrentUser, db: DbDep) -> Messag
     return MessageResponse(message="Logged out")
 
 
-@router.post("/reset-password", response_model=MessageResponse)
+@router.post("/reset-password", response_model=ResetRequestResponse)
 @limiter.limit(settings.AUTH_RATE_LIMIT)
 async def request_password_reset(request: Request, payload: ResetPasswordRequest,
-                                 db: DbDep) -> MessageResponse:
+                                 db: DbDep) -> ResetRequestResponse:
     """Start a password reset.
 
-    There is no mail service in this build, so the token is stored and logged
-    server-side; in DEV_MODE it is also returned so the flow is demonstrable.
-    See docs/DEVIATIONS.md.
+    There is no mail service in this build, so the token is not delivered
+    anywhere: it is stored as a SHA-256 digest and handed back in the response
+    when EXPOSE_RESET_TOKEN is on, which is how the flow stays walkable end to
+    end. See docs/DEVIATIONS.md.
     """
     email = payload.email.lower().strip()
-    user = await db[Collections.USERS].find_one({"email": email}, {"_id": 0, "user_id": 1})
+    user = await db[Collections.USERS].find_one(
+        {"email": email}, {"_id": 0, "user_id": 1})
 
+    token: str | None = None
     if user is not None:
         token = secrets.token_urlsafe(32)
         await db[Collections.USERS].update_one(
             {"user_id": user["user_id"]},
             {"$set": {
-                "reset_token": token,
+                "reset_token_hash": hash_reset_token(token),
                 "reset_token_expires": datetime.now(timezone.utc)
                 + timedelta(minutes=RESET_TOKEN_TTL_MINUTES),
-            }},
+            },
+             # Clear the plaintext column that earlier builds wrote.
+             "$unset": {"reset_token": ""}},
         )
-        logger.info("Password reset token issued for %s: %s", email, token)
-        if settings.DEV_MODE:
-            return MessageResponse(message=f"Reset link sent. DEV_MODE token: {token}")
+        # The user id, never the token. Server logs are routinely readable by
+        # more people than a mailbox is, and this token IS the account.
+        logger.info("Password reset requested for user %s", user["user_id"])
 
-    # Always the same reply, so this cannot be used to enumerate accounts.
-    return MessageResponse(message="Reset link sent")
+    # Identical reply whether or not the address exists, so this cannot be used
+    # to enumerate accounts.
+    return ResetRequestResponse(
+        message="If that email is registered, a reset link has been created.",
+        reset_token=token if (token and settings.EXPOSE_RESET_TOKEN) else None,
+    )
 
 
 @router.post("/reset-password/confirm", response_model=MessageResponse)
 async def confirm_password_reset(payload: ConfirmResetRequest, db: DbDep) -> MessageResponse:
-    user = await db[Collections.USERS].find_one({"reset_token": payload.token}, {"_id": 0})
+    user = await db[Collections.USERS].find_one(
+        {"reset_token_hash": hash_reset_token(payload.token)}, {"_id": 0})
     if user is None:
         raise bad_request("This reset link is invalid or has already been used.")
 
@@ -220,8 +257,13 @@ async def confirm_password_reset(payload: ConfirmResetRequest, db: DbDep) -> Mes
     await db[Collections.USERS].update_one(
         {"user_id": user["user_id"]},
         {"$set": {"password_hash": hash_password(payload.new_password),
-                  "updated_at": utcnow()},
-         "$unset": {"reset_token": "", "reset_token_expires": ""}},
+                  "updated_at": utcnow(),
+                  # Every token minted before now stops working. Without this a
+                  # stolen refresh token outlives the reset meant to shut it
+                  # out -- for up to REFRESH_TOKEN_EXPIRE_DAYS.
+                  "tokens_valid_from": _revocation_stamp()},
+         "$unset": {"reset_token": "", "reset_token_hash": "",
+                    "reset_token_expires": ""}},
     )
     return MessageResponse(message="Password updated. You can now log in.")
 
@@ -285,6 +327,9 @@ async def change_password(payload: ChangePasswordRequest, user: CurrentUser,
     await db[Collections.USERS].update_one(
         {"user_id": user["user_id"]},
         {"$set": {"password_hash": hash_password(payload.new_password),
-                  "updated_at": utcnow()}},
+                  "updated_at": utcnow(),
+                  # Changing your password is also how you throw out a session
+                  # you think someone else is holding.
+                  "tokens_valid_from": _revocation_stamp()}},
     )
     return MessageResponse(message="Password updated")

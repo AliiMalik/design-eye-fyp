@@ -75,6 +75,17 @@ class Settings(BaseSettings):
     LLM_RATE_LIMIT_PER_DAY: int = 50
     LLM_TIMEOUT_SECONDS: int = 90
 
+    # --- password reset ---
+    # There is no mail service in this build, so the reset token is returned in
+    # the API response instead. That is the only way to walk the flow, and it
+    # hands any anonymous caller who knows an email address that account -- so
+    # it defaults to off and must be switched on deliberately.
+    #
+    # Deliberately NOT tied to DEV_MODE. DEV_MODE means "run inference inline
+    # instead of through Celery" -- a wholly unrelated concern, and one you may
+    # well want switched on somewhere this would be indefensible.
+    EXPOSE_RESET_TOKEN: bool = False
+
     # --- rate limiting ---
     AUTH_RATE_LIMIT: str = "10/minute"
 

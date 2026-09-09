@@ -29,6 +29,15 @@ export interface MessageResponse {
   message: string;
 }
 
+/**
+ * Reply to POST /auth/reset-password. `reset_token` is present only when the
+ * API runs with EXPOSE_RESET_TOKEN on, which is how the flow is demonstrated
+ * without a mail service; normally the token arrives by email and never here.
+ */
+export interface ResetRequestResponse extends MessageResponse {
+  reset_token: string | null;
+}
+
 export interface FocusNode {
   x: number;
   y: number;

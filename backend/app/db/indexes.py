@@ -16,6 +16,11 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
     """Create every index the SDS schema and BUILD.md section 7 require."""
     await db[Collections.USERS].create_index([("email", ASCENDING)], unique=True)
     await db[Collections.USERS].create_index([("user_id", ASCENDING)], unique=True)
+    # Password-reset confirm looks a user up by this digest on an unauthenticated
+    # endpoint; unindexed it is a full collection scan. Sparse, because only the
+    # handful of accounts with a reset in flight carry the field.
+    await db[Collections.USERS].create_index(
+        [("reset_token_hash", ASCENDING)], sparse=True)
 
     await db[Collections.PROJECTS].create_index([("user_id", ASCENDING)])
     await db[Collections.PROJECTS].create_index([("project_id", ASCENDING)], unique=True)

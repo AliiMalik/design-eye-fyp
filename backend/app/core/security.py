@@ -82,6 +82,26 @@ def create_refresh_token(user_id: str) -> tuple[str, str, datetime]:
     )
 
 
+def token_predates_revocation(user: dict[str, Any], claims: dict[str, Any]) -> bool:
+    """True when this token was minted before the account's last revocation.
+
+    A password reset or change stamps ``users.tokens_valid_from``; anything
+    issued before that moment stops working, access and refresh alike. Without
+    it a stolen token survives the very reset meant to shut it out, and the
+    victim's "recovery" changes a password the attacker no longer needs.
+
+    Absent stamp means the account has never revoked, so nothing is rejected --
+    which is what keeps this backward compatible with existing documents.
+    """
+    cutoff = user.get("tokens_valid_from")
+    issued_at = claims.get("iat")
+    if cutoff is None or issued_at is None:
+        return False
+    if cutoff.tzinfo is None:  # Motor hands back naive datetimes
+        cutoff = cutoff.replace(tzinfo=timezone.utc)
+    return datetime.fromtimestamp(int(issued_at), tz=timezone.utc) < cutoff
+
+
 def decode_token(token: str, expected_type: TokenType | None = None) -> dict[str, Any]:
     """Decode and validate a JWT. Raises TokenError on any failure.
 

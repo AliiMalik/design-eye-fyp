@@ -20,6 +20,13 @@ os.environ.setdefault("DEV_MODE", "true")
 os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
 os.environ.setdefault("STORAGE_LOCAL_DIR", "./storage_test")
+# Pinned, not defaulted from .env: a developer running with
+# STORAGE_BACKEND=cloudinary would otherwise have the suite upload every test
+# artefact to a real account, and fail with no network.
+os.environ["STORAGE_BACKEND"] = "local"
+# The reset-flow tests need the token back in the response; there is nowhere
+# else it goes. Independent of DEV_MODE on purpose -- see config.py.
+os.environ.setdefault("EXPOSE_RESET_TOKEN", "true")
 # The suite registers dozens of accounts; the production 10/minute ceiling would
 # throttle the tests themselves. Rate limiting is asserted separately below.
 os.environ.setdefault("AUTH_RATE_LIMIT", "5000/minute")

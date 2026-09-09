@@ -48,6 +48,20 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class ResetRequestResponse(BaseModel):
+    """Reply to a reset request.
+
+    ``reset_token`` is populated only when EXPOSE_RESET_TOKEN is on, which is
+    how the flow stays walkable with no mail service. It is a typed field rather
+    than text spliced into ``message`` so the client reads a value instead of
+    parsing a sentence -- the previous "DEV_MODE token: ..." string coupled the
+    UI to the exact wording of a log-style message.
+    """
+
+    message: str
+    reset_token: str | None = None
+
+
 class ConfirmResetRequest(BaseModel):
     token: str
     new_password: str

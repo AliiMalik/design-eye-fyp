@@ -66,6 +66,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Hands the reset token back in the API response; there is no mail
+      # service. Separate from DEV_MODE on purpose: that one only chooses
+      # inline vs Celery inference.
+      EXPOSE_RESET_TOKEN: "${EXPOSE_RESET_TOKEN:-false}"
     volumes:
       # Weights are gitignored and never baked into the image.
       - ./backend/app/ml/weights:/app/app/ml/weights:ro

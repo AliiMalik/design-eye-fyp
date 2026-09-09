@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.errors import forbidden, not_found, unauthorized
-from app.core.security import TokenError, decode_token
+from app.core.security import TokenError, decode_token, token_predates_revocation
 from app.db.mongo import Collections, get_database
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -43,6 +43,10 @@ async def get_current_user(
         raise unauthorized("User no longer exists")
     if not user.get("is_active", True):
         raise forbidden("Account is disabled")
+    # Closes the window a password reset would otherwise leave open: without
+    # this an access token issued beforehand keeps working until it expires.
+    if token_predates_revocation(user, payload):
+        raise unauthorized("This session has been revoked. Please log in again.")
     return user
 
 
