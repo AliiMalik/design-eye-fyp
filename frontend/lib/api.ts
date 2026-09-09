@@ -24,6 +24,23 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+/**
+ * Routes where a 401 means "these credentials are wrong", not "this access
+ * token expired", so refreshing and retrying is pointless.
+ *
+ * Matched as an explicit list rather than a `/auth/` prefix test: every other
+ * route under /auth/ -- me, me/avatar, change-password, logout -- carries an
+ * ordinary access token and MUST refresh like any other call. Treating the
+ * whole prefix as un-refreshable made the settings page fail hard the moment
+ * the 15-minute access token expired.
+ */
+const NO_REFRESH_ROUTES = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/reset-password",
+];
+
 /** Queue concurrent 401s behind a single refresh so we mint one token, not N. */
 let refreshing: Promise<string | null> | null = null;
 
@@ -51,8 +68,14 @@ api.interceptors.response.use(
       | (InternalAxiosRequestConfig & { _retried?: boolean })
       | undefined;
 
-    const isAuthCall = original?.url?.includes("/auth/");
-    if (error.response?.status !== 401 || !original || original._retried || isAuthCall) {
+    const path = original?.url ?? "";
+    const isCredentialCall = NO_REFRESH_ROUTES.some((route) => path.includes(route));
+    if (
+      error.response?.status !== 401 ||
+      !original ||
+      original._retried ||
+      isCredentialCall
+    ) {
       return Promise.reject(error);
     }
 
