@@ -109,11 +109,11 @@ def build(out: Path, repo_url: str) -> None:
     st.append(step("0", "Install these first", [pre]))
 
     # --- 1 clone ---
-    st.append(step("1", "Clone the repository", [code(f"git clone {repo_url}")]))
-    st.append(step("1b", "", [code("cd designeye")]))
-    st.pop()  # merge 1b into 1 visually
-    st[-1] = step("1", "Clone the repository", [
-        code(f"git clone {repo_url}"), Spacer(1, 2), code("cd designeye")])
+    # git clone creates a folder named after the repository, so derive it from
+    # the URL rather than hardcoding one that may not match.
+    folder = repo_url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+    st.append(step("1", "Clone the repository", [
+        code(f"git clone {repo_url}"), Spacer(1, 2), code(f"cd {folder}")]))
 
     # --- 2 weights ---
     st.append(step("2", "Add the model file", [
@@ -238,7 +238,7 @@ def build(out: Path, repo_url: str) -> None:
 
 
 if __name__ == "__main__":
-    url = sys.argv[1] if len(sys.argv) > 1 else "https://github.com/&lt;your-username&gt;/designeye.git"
+    url = sys.argv[1] if len(sys.argv) > 1 else "https://github.com/AliiMalik/design-eye-fyp.git"
     out = Path("D:/FYP/designeye project/designeye/docs/SETUP_GUIDE.pdf")
     build(out, url)
     print(f"wrote {out}  ({out.stat().st_size // 1024} KB)")
