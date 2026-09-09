@@ -26,6 +26,7 @@ from app.schemas.analysis import (
 )
 from app.schemas.common import MessageResponse
 from app.services.analytics import FocusNodeData, scanpath_timeline
+from app.services.cleanup import purge_assets
 from app.services.jobs import enqueue_analysis
 from app.services.pdf import build_result_report
 from app.services.scanpath import (
@@ -170,24 +171,8 @@ async def rerun_analysis(asset_id: str, background: BackgroundTasks,
 @router.delete("/results/{asset_id}", response_model=MessageResponse)
 async def delete_result(asset_id: str, user: CurrentUser, db: DbDep) -> MessageResponse:
     """Delete an asset and its derived artefacts."""
-    asset = await get_owned_asset(db, asset_id, user["user_id"])
-    result = await db[Collections.HEATMAP_RESULTS].find_one({"asset_id": asset_id},
-                                                            {"_id": 0})
-    storage = get_storage()
-    keys = [asset.get("storage_key")]
-    if result:
-        keys += list((result.get("storage_keys") or {}).values())
-    for key in [k for k in keys if k]:
-        try:
-            storage.delete(key)
-        except Exception as exc:  # noqa: BLE001 - DB cleanup still proceeds
-            logger.warning("Could not delete stored object %s: %s", key, exc)
-
-    await db[Collections.HEATMAP_RESULTS].delete_many({"asset_id": asset_id})
-    await db[Collections.INFERENCE_TASKS].delete_many({"asset_id": asset_id})
-    await db[Collections.SUGGESTIONS].delete_many(
-        {"result_id": (result or {}).get("result_id", "")})
-    await db[Collections.MOCKUP_ASSETS].delete_one({"asset_id": asset_id})
+    await get_owned_asset(db, asset_id, user["user_id"])
+    await purge_assets(db, [asset_id])
     return MessageResponse(message="Analysis deleted")
 
 

@@ -15,6 +15,7 @@ from app.services.llm import (
     _parse_flow,
     generate_flow_suggestions,
 )
+from app.services.storage import get_storage
 
 
 def make_pdf(pages: int = 4, clean_from: int = 1) -> bytes:
@@ -370,6 +371,50 @@ async def test_deleting_a_batch_removes_every_screen(client, user, db):
     assert (await client.get(f"/batches/{batch_id}",
                              headers=user["headers"])).status_code == 404
     assert await db[Collections.MOCKUP_ASSETS].count_documents({"batch_id": batch_id}) == 0
+
+
+@pytest.mark.slow
+async def test_deleting_the_project_takes_the_batch_and_its_files(client, user, db):
+    """A flow's project owns its screens, its files and its grouping document.
+
+    The batch document is the one that bites: left behind it lists zero screens,
+    _derive_status reads that as "processing", and the batch view polls a flow
+    that will never finish.
+    """
+    resp = await client.post("/upload/batch", headers=user["headers"],
+                             files={"file": ("f.pdf", make_pdf(2), "application/pdf")})
+    body = resp.json()
+    batch_id, project_id = body["batch_id"], body["project_id"]
+    await wait_for_batch(client, user["headers"], batch_id)
+    await client.post(f"/batches/{batch_id}/suggestions", headers=user["headers"], json={})
+
+    assets = await db[Collections.MOCKUP_ASSETS].find(
+        {"batch_id": batch_id}, {"_id": 0}).to_list(length=None)
+    asset_ids = [a["asset_id"] for a in assets]
+    results = await db[Collections.HEATMAP_RESULTS].find(
+        {"asset_id": {"$in": asset_ids}}, {"_id": 0}).to_list(length=None)
+
+    keys = [a["storage_key"] for a in assets]
+    keys += [k for r in results for k in (r.get("storage_keys") or {}).values()]
+    storage = get_storage()
+    assert keys and all(storage.exists(k) for k in keys), "fixture never stored anything"
+
+    result_ids = [r["result_id"] for r in results]
+    assert await db[Collections.SUGGESTIONS].count_documents(
+        {"result_id": {"$in": result_ids}}) > 0
+
+    assert (await client.delete(f"/projects/{project_id}",
+                                headers=user["headers"])).status_code == 200
+
+    assert (await client.get(f"/batches/{batch_id}",
+                             headers=user["headers"])).status_code == 404
+    assert await db[Collections.MOCKUP_ASSETS].count_documents(
+        {"batch_id": batch_id}) == 0
+    assert await db[Collections.HEATMAP_RESULTS].count_documents(
+        {"asset_id": {"$in": asset_ids}}) == 0
+    assert await db[Collections.SUGGESTIONS].count_documents(
+        {"result_id": {"$in": result_ids}}) == 0
+    assert not any(storage.exists(k) for k in keys), "stored objects were orphaned"
 
 
 def test_flow_defaults_are_sane():

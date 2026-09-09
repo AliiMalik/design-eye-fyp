@@ -21,6 +21,7 @@ from app.schemas.analysis import (
     ResultListItem,
 )
 from app.schemas.common import MessageResponse
+from app.services.cleanup import purge_assets
 
 router = APIRouter(tags=["projects"])
 
@@ -101,15 +102,19 @@ async def update_project(project_id: str, payload: ProjectUpdate,
 @router.delete("/projects/{project_id}", response_model=MessageResponse)
 async def delete_project(project_id: str, user: CurrentUser,
                          db: DbDep) -> MessageResponse:
-    """Delete a project and everything derived from it."""
+    """Delete a project and everything derived from it.
+
+    Batches group screens by project, so a flow's grouping document has to go
+    with it. Left behind it lists zero screens, and ``_derive_status`` reads a
+    batch with no assets as "processing" -- which the batch view then polls
+    forever, because only a settled status stops it.
+    """
     await get_owned_project(db, project_id, user["user_id"])
     asset_ids = await db[Collections.MOCKUP_ASSETS].distinct(
         "asset_id", {"project_id": project_id})
 
-    if asset_ids:
-        await db[Collections.HEATMAP_RESULTS].delete_many({"asset_id": {"$in": asset_ids}})
-        await db[Collections.INFERENCE_TASKS].delete_many({"asset_id": {"$in": asset_ids}})
-        await db[Collections.MOCKUP_ASSETS].delete_many({"project_id": project_id})
+    await purge_assets(db, asset_ids)
+    await db[Collections.BATCHES].delete_many({"project_id": project_id})
     await db[Collections.PROJECTS].delete_one({"project_id": project_id})
     return MessageResponse(message="Project deleted")
 

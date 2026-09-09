@@ -181,8 +181,12 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: async (projectId: string) =>
       (await api.delete(`/projects/${projectId}`)).data,
+    // Deleting a project cascades to its assets and its batches, so the result
+    // and batch lists are stale too -- not just the project list.
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["projects"] });
+      void qc.invalidateQueries({ queryKey: ["results"] });
+      void qc.invalidateQueries({ queryKey: ["batches"] });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
     },
   });
