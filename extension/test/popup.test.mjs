@@ -26,6 +26,7 @@ const check = (name, cond, detail = "") => {
 
 function makeEl(id) {
   const listeners = {};
+  const classes = new Set();
   return {
     id,
     hidden: true,
@@ -35,7 +36,15 @@ function makeEl(id) {
     href: "",
     src: "",
     disabled: false,
+    files: null,
     style: {},
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      contains: (c) => classes.has(c),
+    },
+    removeAttribute(name) { this[name] = ""; },
+    click: () => listeners.click?.(),
     addEventListener: (ev, fn) => { listeners[ev] = fn; },
     _fire: (ev, arg) => listeners[ev]?.(arg),
     _has: (ev) => Boolean(listeners[ev]),
@@ -72,8 +81,26 @@ const chrome = {
   },
 };
 
+// The popup listens for paste on the document itself, because a screenshot is
+// taken with nothing focused and a paste target you must click first is one
+// people miss.
+const docListeners = {};
+
+/** Enough of FileReader to carry a fake blob through stageImage(). */
+class FakeFileReader {
+  readAsDataURL(blob) {
+    this.result = `data:${blob.type};base64,SCREENSHOT`;
+    setImmediate(() => (blob._unreadable ? this.onerror?.() : this.onload?.()));
+  }
+}
+
 const sandbox = {
-  document: { getElementById: (id) => els[id] || makeEl(id) },
+  document: {
+    getElementById: (id) => els[id] || makeEl(id),
+    addEventListener: (ev, fn) => { docListeners[ev] = fn; },
+  },
+  navigator: { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+  FileReader: FakeFileReader,
   chrome,
   console,
   setTimeout,
@@ -221,6 +248,94 @@ await els.analyse._fire("click");
 await settle(); await settle();
 check("names the project", /figma\.com/.test(els.savedTo.textContent), els.savedTo.textContent);
 check("saved-to is visible", els.savedTo.hidden === false);
+
+// --- 12. pasting a screenshot --------------------------------------------
+console.log("\n12. paste a screenshot instead of capturing");
+store = { token: "t0ken", apiBase: "http://localhost:8000/api/v1" };
+await sandbox.boot(); await settle();
+
+/** A clipboard carrying one image, shaped like the real DataTransfer. */
+const imagePaste = (blob) => ({
+  preventDefault() { this.defaultPrevented = true; },
+  defaultPrevented: false,
+  clipboardData: { items: [{ kind: "file", type: blob.type, getAsFile: () => blob }] },
+});
+const fakeBlob = (type, size, extra = {}) => ({ type, size, name: "image.png", ...extra });
+
+check("the popup listens for paste", Boolean(docListeners.paste));
+
+docListeners.paste(imagePaste(fakeBlob("image/png", 240 * 1024)));
+await settle();
+check("stages the pasted image", els.pastedCard.hidden === false);
+check("offers to analyse it", els.analysePasted.hidden === false);
+check("previews the thumbnail", /^data:image\/png/.test(els.pastedThumb.src), els.pastedThumb.src);
+check("names it by the moment it was pasted",
+      /^screenshot-\d{4}-\d{2}-\d{2}-\d{6}\.png$/.test(els.pastedName.textContent),
+      els.pastedName.textContent);
+check("shows a readable size", els.pastedSize.textContent === "240 KB", els.pastedSize.textContent);
+
+// --- 13. analysing what was pasted ----------------------------------------
+console.log("\n13. analyse the pasted screenshot");
+nextResponse = { ok: true, data: {
+  site: "Pasted screenshots",
+  result: { clarity_score: 62.5, viewport_count: 1, heatmap_url: "http://h/p.png", asset_id: "pasted1" },
+} };
+await els.analysePasted._fire("click");
+await settle(); await settle();
+check("sends ANALYSE_IMAGE", lastMessage.type === "ANALYSE_IMAGE", lastMessage.type);
+check("sends the data URL", /^data:image\/png/.test(lastMessage.dataUrl), String(lastMessage.dataUrl).slice(0, 24));
+check("sends the stamped filename", /^screenshot-/.test(lastMessage.filename), lastMessage.filename);
+check("shows the result", visible().join() === "result", visible().join());
+check("score rendered", els.scoreValue.textContent === "62.5", els.scoreValue.textContent);
+check("names the pasted project", /Pasted screenshots/.test(els.savedTo.textContent), els.savedTo.textContent);
+check("clears the staged image afterwards", els.pastedCard.hidden === true);
+
+// --- 14. what paste refuses ----------------------------------------------
+console.log("\n14. paste refuses what the API would");
+store = { token: "t0ken" };
+await sandbox.boot(); await settle();
+
+const before = els.pastedCard.hidden;
+const textOnly = {
+  preventDefault() { this.defaultPrevented = true; },
+  defaultPrevented: false,
+  clipboardData: { items: [{ kind: "string", type: "text/plain", getAsFile: () => null }] },
+};
+docListeners.paste(textOnly);
+await settle();
+check("ignores a text paste", els.pastedCard.hidden === before);
+check("does not swallow the keystroke", textOnly.defaultPrevented === false);
+
+docListeners.paste(imagePaste(fakeBlob("image/gif", 1024)));
+await settle();
+check("refuses a GIF", /PNG, JPG, or WEBP/.test(els.readyError.textContent), els.readyError.textContent);
+check("nothing staged", els.pastedCard.hidden === true);
+
+docListeners.paste(imagePaste(fakeBlob("image/png", 11 * 1024 * 1024)));
+await settle();
+check("refuses an oversized image", /limit is 10MB/.test(els.readyError.textContent), els.readyError.textContent);
+check("still nothing staged", els.pastedCard.hidden === true);
+
+// --- 15. clearing and expiry on the paste path ---------------------------
+console.log("\n15. the paste path behaves like the capture path");
+docListeners.paste(imagePaste(fakeBlob("image/webp", 90 * 1024)));
+await settle();
+check("webp is accepted", els.pastedCard.hidden === false);
+els.pastedClear._fire("click");
+check("remove clears the card", els.pastedCard.hidden === true);
+check("and withdraws the analyse button", els.analysePasted.hidden === true);
+
+docListeners.paste(imagePaste(fakeBlob("image/png", 50 * 1024)));
+await settle();
+const pastedSent = [];
+nextResponse = (msg) => {
+  pastedSent.push(msg.type);
+  return msg.type === "ANALYSE_IMAGE" ? { ok: false, error: "SESSION_EXPIRED" } : { ok: true };
+};
+await els.analysePasted._fire("click");
+await settle(); await settle();
+check("an expired session signs out here too", visible().join() === "auth", visible().join());
+check("and asks the worker to sign out", pastedSent.includes("LOGOUT"), pastedSent.join(","));
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

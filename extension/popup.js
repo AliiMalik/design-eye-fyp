@@ -29,7 +29,7 @@ function explain(score, viewportCount) {
   }
   if (score >= 75) return "Attention concentrates cleanly on this page.";
   if (score >= 40) return "Attention is workable but spread across several places.";
-  return "Attention is scattered — a lot competes for the first look.";
+  return "Attention is scattered; a lot competes for the first look.";
 }
 
 async function boot() {
@@ -117,29 +117,161 @@ $("signout").addEventListener("click", async () => {
   show("auth");
 });
 
-$("again").addEventListener("click", () => show("ready"));
+$("again").addEventListener("click", () => { clearPasted(); show("ready"); });
 
-$("analyse").addEventListener("click", async () => {
-  $("readyError").hidden = true;
-  const fullPage = $("fullPage").checked;
-  show("working");
-  $("workingText").textContent = fullPage ? "Scrolling and capturing…" : "Capturing…";
+/* --- paste a screenshot ---------------------------------------------------
+ *
+ * The other half of the extension: analysing the page you are on covers the
+ * live web, and this covers everything else -- a Figma frame, a mockup in
+ * another app, or the browser pages Chrome refuses to let us capture.
+ */
 
-  const res = await send({ type: "ANALYSE", fullPage });
+// Mirrors MAX_UPLOAD_MB in backend/app/config.py. Checked here so an oversized
+// image is refused before it is base64-inflated into a worker message, rather
+// than after a slow round trip ending in a 400.
+const MAX_IMAGE_MB = 10;
+const PASTEABLE = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
-  if (!res?.ok) {
-    show("ready");
-    // A stale token is the one failure worth handling rather than reporting.
-    if (res?.error === "SESSION_EXPIRED") {
-      await send({ type: "LOGOUT" });
-      $("signout").hidden = true;
-      show("auth");
-      return fail($("authError"), "Your session expired. Sign in again.");
-    }
-    return fail($("readyError"), res?.error || "Something went wrong.");
+let pastedDataUrl = null;
+let pastedName = "";
+
+if (/Mac|iPhone|iPad|iPod/.test(navigator.userAgent)) $("modKey").textContent = "⌘";
+
+function stampedName(type) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const d = new Date();
+  return `screenshot-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    + `-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+    + `.${PASTEABLE[type] || "png"}`;
+}
+
+function readableSize(bytes) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function flashDropzone() {
+  $("dropzone").classList.add("hot");
+  setTimeout(() => $("dropzone").classList.remove("hot"), 700);
+}
+
+function clearPasted() {
+  pastedDataUrl = null;
+  pastedName = "";
+  $("pastedCard").hidden = true;
+  $("analysePasted").hidden = true;
+  $("pastedThumb").removeAttribute("src");
+}
+
+/** Take a blob from any of the three routes in and stage it for analysis. */
+function stageImage(blob) {
+  if (!blob || !PASTEABLE[blob.type]) {
+    return fail($("readyError"), "Use a PNG, JPG, or WEBP image.");
+  }
+  if (blob.size > MAX_IMAGE_MB * 1024 * 1024) {
+    return fail(
+      $("readyError"),
+      `That image is ${readableSize(blob.size)}; the limit is ${MAX_IMAGE_MB}MB.`,
+    );
   }
 
-  const { result } = res.data;
+  const reader = new FileReader();
+  reader.onload = () => {
+    $("readyError").hidden = true;
+    pastedDataUrl = reader.result;
+    pastedName = blob.name && blob.name !== "image.png" ? blob.name : stampedName(blob.type);
+
+    $("pastedThumb").src = pastedDataUrl;
+    $("pastedName").textContent = pastedName;
+    $("pastedSize").textContent = readableSize(blob.size);
+    $("pastedCard").hidden = false;
+    $("analysePasted").hidden = false;
+    flashDropzone();
+  };
+  reader.onerror = () => fail($("readyError"), "That image could not be read.");
+  reader.readAsDataURL(blob);
+}
+
+// Ctrl+V anywhere in the popup. No clipboardRead permission is needed for a
+// real paste event, which is why this is the primary route in rather than
+// navigator.clipboard.read() -- that would add a scary install warning for a
+// feature the keystroke already covers.
+document.addEventListener("paste", (event) => {
+  if ($("ready").hidden) return; // signed out, or a run is under way
+  const item = Array.from(event.clipboardData?.items || []).find(
+    (i) => i.kind === "file" && i.type.startsWith("image/"),
+  );
+  if (!item) return; // a text paste; leave the form fields alone
+  event.preventDefault();
+  stageImage(item.getAsFile());
+});
+
+$("dropzone").addEventListener("click", () => $("filePick").click());
+$("dropzone").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    $("filePick").click();
+  }
+});
+
+$("dropzone").addEventListener("dragover", (e) => {
+  e.preventDefault();
+  $("dropzone").classList.add("hot");
+});
+$("dropzone").addEventListener("dragleave", () => $("dropzone").classList.remove("hot"));
+$("dropzone").addEventListener("drop", (e) => {
+  e.preventDefault();
+  $("dropzone").classList.remove("hot");
+  stageImage(e.dataTransfer?.files?.[0]);
+});
+
+$("filePick").addEventListener("change", (e) => {
+  const chosen = e.target.files?.[0];
+  if (chosen) stageImage(chosen);
+  e.target.value = ""; // so re-picking the same file fires change again
+});
+
+$("pastedClear").addEventListener("click", clearPasted);
+
+$("analysePasted").addEventListener("click", async () => {
+  if (!pastedDataUrl) return;
+  $("readyError").hidden = true;
+  show("working");
+  $("workingText").textContent = "Analysing your screenshot…";
+
+  const res = await send({
+    type: "ANALYSE_IMAGE", dataUrl: pastedDataUrl, filename: pastedName,
+  });
+  if (!(await handled(res))) return;
+  clearPasted();
+  await renderResult(res.data);
+});
+
+/**
+ * Deal with a failed run. Returns true when the caller may keep going.
+ *
+ * Shared by both routes so a capture and a pasted screenshot cannot end up
+ * treating an expired session differently.
+ */
+async function handled(res) {
+  if (res?.ok) return true;
+  show("ready");
+  // A stale token is the one failure worth handling rather than reporting.
+  if (res?.error === "SESSION_EXPIRED") {
+    await send({ type: "LOGOUT" });
+    $("signout").hidden = true;
+    $("account").hidden = true;
+    show("auth");
+    fail($("authError"), "Your session expired. Sign in again.");
+    return false;
+  }
+  fail($("readyError"), res?.error || "Something went wrong.");
+  return false;
+}
+
+async function renderResult(data) {
+  const { result } = data;
   const b = band(result.clarity_score);
   $("scoreValue").textContent = result.clarity_score.toFixed(1);
   $("scoreValue").style.color = b.hex;
@@ -148,9 +280,10 @@ $("analyse").addEventListener("click", async () => {
   $("scoreNote").textContent = explain(result.clarity_score, result.viewport_count);
   $("heatmap").src = result.heatmap_url;
 
-  // Say where it went. Captures land in a project named after the site, so this
-  // is the difference between "it worked" and "I know where to find it".
-  const site = res.data.site;
+  // Say where it went. Captures land in a project named after the site and
+  // pasted shots in one of their own, so this is the difference between "it
+  // worked" and "I know where to find it".
+  const site = data.site;
   $("savedTo").textContent = site ? `Saved to your “${site}” project.` : "";
   $("savedTo").hidden = !site;
 
@@ -161,6 +294,17 @@ $("analyse").addEventListener("click", async () => {
   $("openFull").href = `${web}/results/${result.asset_id}`;
 
   show("result");
+}
+
+$("analyse").addEventListener("click", async () => {
+  $("readyError").hidden = true;
+  const fullPage = $("fullPage").checked;
+  show("working");
+  $("workingText").textContent = fullPage ? "Scrolling and capturing…" : "Capturing…";
+
+  const res = await send({ type: "ANALYSE", fullPage });
+  if (!(await handled(res))) return;
+  await renderResult(res.data);
 });
 
 boot();

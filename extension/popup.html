@@ -60,6 +60,30 @@
         </span>
       </label>
       <button id="analyse" class="primary">Analyse this page</button>
+
+      <div class="or"><span>or</span></div>
+
+      <div id="dropzone" class="dropzone" role="button" tabindex="0"
+           aria-label="Paste, drop, or choose a screenshot to analyse">
+        <strong>Paste a screenshot</strong>
+        <em>
+          <kbd id="modKey">Ctrl</kbd><kbd>V</kbd>, drop an image here,
+          or click to choose a file
+        </em>
+      </div>
+
+      <div id="pastedCard" class="pasted" hidden>
+        <img id="pastedThumb" class="pasted-thumb" alt="" />
+        <div class="pasted-meta">
+          <strong id="pastedName"></strong>
+          <span id="pastedSize"></span>
+        </div>
+        <button id="pastedClear" class="iconbtn" type="button"
+                aria-label="Remove this screenshot">&times;</button>
+      </div>
+      <button id="analysePasted" class="primary" hidden>Analyse screenshot</button>
+
+      <input id="filePick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
       <p id="readyError" class="error" role="alert" hidden></p>
     </section>
 

@@ -112,11 +112,42 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+/**
+ * The tail every analysis shares: upload the PNG, then wait for the result.
+ *
+ * Polling lives here rather than in the popup because the popup may already be
+ * gone -- it is torn down the moment focus moves, and an upload that dies with
+ * it would leave the user staring at a spinner that never resolves.
+ */
+async function uploadAndWait(blob, filename, projectTitle) {
+  const form = new FormData();
+  form.append("file", blob, filename);
+  // The server does find-or-create on the title, so everything from one source
+  // collects in one project instead of scattering through a single bucket.
+  if (projectTitle) form.append("project_title", projectTitle);
+
+  const started = await apiFetch("/upload", { method: "POST", body: form });
+
+  for (let i = 0; i < 90; i += 1) {
+    const status = await apiFetch(`/status/${started.task_id}`);
+    if (status.status === "complete") {
+      return apiFetch(`/results/${started.asset_id}`);
+    }
+    if (status.status === "failed") throw new Error(status.error || "Analysis failed.");
+    await sleep(1000);
+  }
+  throw new Error("Analysis is taking longer than expected.");
+}
+
 async function analyse({ fullPage }) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) throw new Error("No active tab.");
   if (/^(chrome|edge|about|chrome-extension):/i.test(tab.url || "")) {
-    throw new Error("Chrome blocks capture on browser pages. Open a website first.");
+    // Point at the way out rather than just the wall: a screenshot of this very
+    // page can still be pasted, which is the whole reason that path exists.
+    throw new Error(
+      "Chrome blocks capture on browser pages. Open a website, or paste a screenshot below.",
+    );
   }
 
   const { dataUrl, slices } = fullPage
@@ -124,30 +155,36 @@ async function analyse({ fullPage }) {
     : { dataUrl: await captureViewport(tab.windowId), slices: 1 };
 
   const blob = await (await fetch(dataUrl)).blob();
-  const form = new FormData();
   const name = (tab.title || "page").replace(/[^\w\- ]+/g, "").slice(0, 60) || "page";
-  form.append("file", blob, `${name}.png`);
 
-  // Group captures by the site they came from. The server does find-or-create
-  // on the title, so every capture of one site lands in one project instead of
-  // scattering through a single bucket.
   let site = "";
   try { site = new URL(tab.url).hostname.replace(/^www\./, ""); } catch { /* keep blank */ }
-  if (site) form.append("project_title", site);
 
-  const started = await apiFetch("/upload", { method: "POST", body: form });
+  const result = await uploadAndWait(blob, `${name}.png`, site);
+  return { result, slices, site, title: tab.title, url: tab.url };
+}
 
-  // Poll rather than hold the popup open: the popup may already be gone.
-  for (let i = 0; i < 90; i += 1) {
-    const status = await apiFetch(`/status/${started.task_id}`);
-    if (status.status === "complete") {
-      const result = await apiFetch(`/results/${started.asset_id}`);
-      return { result, slices, site, title: tab.title, url: tab.url };
-    }
-    if (status.status === "failed") throw new Error(status.error || "Analysis failed.");
-    await sleep(1000);
+// A pasted screenshot has no site to be filed under, so the captures all collect
+// in one project of their own rather than disappearing into "My Uploads"
+// alongside everything uploaded from the web app.
+const PASTED_PROJECT = "Pasted screenshots";
+
+/**
+ * Analyse an image the user pasted, dropped, or picked in the popup.
+ *
+ * It arrives as a data URL because a Blob cannot be structured-cloned across
+ * the popup/worker boundary. The popup enforces the size ceiling before
+ * sending, so the base64 inflation never reaches a message limit here.
+ */
+async function analyseImage({ dataUrl, filename }) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    throw new Error("That does not look like an image.");
   }
-  throw new Error("Analysis is taking longer than expected.");
+  const blob = await (await fetch(dataUrl)).blob();
+  const result = await uploadAndWait(
+    blob, filename || "screenshot.png", PASTED_PROJECT,
+  );
+  return { result, slices: 1, site: PASTED_PROJECT, title: filename, url: "" };
 }
 
 /**
@@ -202,6 +239,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg.type) {
       case "ANALYSE":
         return { ok: true, data: await analyse({ fullPage: msg.fullPage }) };
+      case "ANALYSE_IMAGE":
+        return {
+          ok: true,
+          data: await analyseImage({ dataUrl: msg.dataUrl, filename: msg.filename }),
+        };
       case "REGISTER": {
         const { apiBase } = await getSettings();
         const res = await fetch(`${apiBase}/auth/register`, {

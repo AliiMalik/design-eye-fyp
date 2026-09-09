@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
+  ClipboardPaste,
   FileImage,
   Layers,
   Loader2,
@@ -18,9 +19,10 @@ import { toast } from "sonner";
 
 import { Bezel } from "@/components/ui/bezel";
 import { Button } from "@/components/ui/button";
-import { Badge, Eyebrow, Reveal } from "@/components/ui/primitives";
+import { Eyebrow, Reveal } from "@/components/ui/primitives";
 import { useProjects, useTaskPolling, useUpload, useUploadBatch } from "@/hooks/use-api";
 import { apiErrorMessage } from "@/lib/api";
+import { imageFromPaste, readImageFromClipboard } from "@/lib/clipboard";
 import { STAGE_LABELS, STAGE_ORDER, cn, formatBytes } from "@/lib/utils";
 
 const ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.pdf";
@@ -69,8 +71,22 @@ function UploadFlow() {
   const [multiPage, setMultiPage] = useState<number | null>(null);
   const [device, setDevice] = useState("phone");
   const [scrolls, setScrolls] = useState(false);
+  // Briefly lights the drop zone after a paste, so a keystroke that touched
+  // nothing the user was pointing at still has a visible effect.
+  const [pasteFlash, setPasteFlash] = useState(false);
+  // Resolved after mount, never during render: navigator is not available on
+  // the server, and branching rendered output on it is exactly the hydration
+  // mismatch app/providers.tsx warns about.
+  const [modKey, setModKey] = useState("Ctrl");
 
   const { status, timedOut, elapsedMs } = useTaskPolling(taskId);
+
+  useEffect(() => {
+    const mac = /Mac|iPhone|iPad|iPod/.test(
+      navigator.userAgent || navigator.platform || "",
+    );
+    if (mac) setModKey("⌘");
+  }, []);
 
   useEffect(() => {
     if (!preview) return;
@@ -114,6 +130,52 @@ function UploadFlow() {
       probe.src = url;
     }
   }, []);
+
+  /** A pasted screenshot is an ordinary upload; only its origin differs. */
+  const acceptPasted = useCallback(
+    (pasted: File) => {
+      accept(pasted);
+      setPasteFlash(true);
+      toast.success("Screenshot pasted.");
+    },
+    [accept],
+  );
+
+  useEffect(() => {
+    if (!pasteFlash) return;
+    const t = window.setTimeout(() => setPasteFlash(false), 750);
+    return () => window.clearTimeout(t);
+  }, [pasteFlash]);
+
+  // Ctrl+V anywhere on the page, rather than only inside the drop zone: after
+  // taking a screenshot nobody has focused anything, and a paste target you
+  // must first click is a paste target people miss.
+  useEffect(() => {
+    if (taskId) return; // analysis under way; the picker is gone
+    const onPaste = (event: ClipboardEvent) => {
+      const pasted = imageFromPaste(event);
+      // No image on the clipboard means an ordinary text paste. Leave it alone
+      // so pasting into a field on this page keeps working normally.
+      if (!pasted) return;
+      event.preventDefault();
+      acceptPasted(pasted);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [taskId, acceptPasted]);
+
+  const pasteFromClipboard = async () => {
+    const outcome = await readImageFromClipboard();
+    if (outcome.ok) {
+      acceptPasted(outcome.file);
+      return;
+    }
+    toast.error(
+      outcome.reason === "empty"
+        ? "No image on the clipboard. Take a screenshot, then try again."
+        : `Your browser blocked clipboard access. Press ${modKey} + V instead.`,
+    );
+  };
 
   const start = () => {
     if (!file) return;
@@ -218,7 +280,7 @@ function UploadFlow() {
                     "flex cursor-pointer flex-col items-center justify-center rounded-[1.5rem]",
                     "border-2 border-dashed px-6 py-14 text-center",
                     "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                    dragging
+                    dragging || pasteFlash
                       ? "scale-[1.015] border-indigo-500 bg-indigo-50/70 shadow-[var(--shadow-glow)] dark:bg-indigo-500/10"
                       : "border-[var(--color-hairline-strong)] bg-[var(--color-surface-2)] hover:border-indigo-400",
                   )}
@@ -232,7 +294,7 @@ function UploadFlow() {
                   </motion.span>
 
                   <p className="mt-6 font-display text-[17px] font-semibold">
-                    Drag &amp; drop your mockup here
+                    Drop a mockup, or paste a screenshot
                   </p>
                   <p className="mt-1.5 text-[13px] text-[var(--color-muted)]">
                     Files are processed securely.{" "}
@@ -252,13 +314,41 @@ function UploadFlow() {
                   />
                 </div>
 
+                {/* Sits outside the drop zone: nested inside it, every click
+                    would bubble up and open the file dialog as well. */}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                  <button
+                    type="button"
+                    onClick={pasteFromClipboard}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-xl px-3.5 py-2",
+                      "text-[13px] font-medium text-[var(--color-ink)]",
+                      "bg-[var(--color-surface-2)] ring-1 ring-[var(--color-hairline)]",
+                      "transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                      "hover:text-indigo-600 hover:ring-indigo-400",
+                    )}
+                  >
+                    <ClipboardPaste size={15} strokeWidth={1.5} />
+                    Paste screenshot
+                  </button>
+                  <p className="text-[12px] text-[var(--color-muted)]">
+                    or press{" "}
+                    <kbd className="rounded-md bg-[var(--color-surface-2)] px-1.5 py-0.5 font-sans text-[11px] font-medium ring-1 ring-[var(--color-hairline)]">
+                      {modKey}
+                    </kbd>{" "}
+                    <kbd className="rounded-md bg-[var(--color-surface-2)] px-1.5 py-0.5 font-sans text-[11px] font-medium ring-1 ring-[var(--color-hairline)]">
+                      V
+                    </kbd>{" "}
+                    anywhere on this page
+                  </p>
+                </div>
+
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-[12px] text-[var(--color-muted)]">
                     Supported: <span className="font-medium">PNG, JPG, WEBP, SVG, PDF</span>{" "}
                     · Max size: <span className="font-medium">{MAX_MB}MB</span>, or{" "}
                     <span className="font-medium">{MAX_PDF_MB}MB</span> for a PDF
                   </p>
-                  <Badge tone="neutral">stage3-ui-v1</Badge>
                 </div>
 
                 <AnimatePresence>
@@ -445,7 +535,7 @@ function UploadFlow() {
                       {failed
                         ? "Analysis did not finish"
                         : status?.status === "complete"
-                          ? "Complete — opening results…"
+                          ? "Complete, opening results…"
                           : `Working… ${Math.round(elapsedMs / 1000)}s elapsed`}
                     </p>
                   </div>
@@ -506,7 +596,7 @@ function UploadFlow() {
                     />
                     <div>
                       <p className="text-[13px] font-medium text-amber-900 dark:text-amber-200">
-                        This PDF has {multiPage} screens — only the first was analysed.
+                        This PDF has {multiPage} screens. Only the first was analysed.
                       </p>
                       <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800/90 dark:text-amber-200/80">
                         Score all {multiPage} together and review the whole journey in
